@@ -1,0 +1,16 @@
+fecha,sitio,servicio,responsabilidad,motivo,afectacion,descripcion
+01-04-2025,Artigas,Todos,Accesa,Incidencia externa,Parcial,"reunion de toda la operativa con Gerencia General y Gerencia de operaciones, capital humano y tecnologia"
+08-04-2025,Aguada,Todos,Cliente,Conectividad,Parcial,"A las 18:10hs aprox, experimentamos intermitencias en la red, generaron caida de outlook, problemas en aplicacoines e inconvenientes en las plataformas de atencion."
+08-04-2025,Aguada,Todos,Cliente,Conectividad,Parcial,"Intermitencias en la red, 20:05hs aprox"
+08-04-2025,Todos,Todos,Accesa,Plataforma de atención,Parcial,Mantenimiento de U Contact de 23:15 a 23:50. Los agentes pasaron a atender por Ip Contact mientras se realizó la maniobra prevista. 
+09-04-2025,Todos,611,Cliente,Incidencia externa,Total,"Sin conexión a Internet desde 14 a 16:00 hs, con afectación total para Movil y BO Movil"
+09-04-2025,Todos,Todos,Cliente,Conectividad,Total,Por un inconveniente de conexión de antel no tuvimos acceso a Genesys y se perdieron muchos chat quedando un bajo porcentaje de nivel de servicio. Hora aproximada de 14 a 16hs.
+12-04-2025,Todos,611,Cliente,Aumento de tráfico,Parcial,Caída de WhatsApp desde 11:30 a 12:10 aprox. 
+16-04-2025,Todos,611,Cliente,Incidencia externa,Sin afectación,Envio de SMS de importe y vencimiento de factura
+22-04-2025,Artigas,Todos,Accesa,Asambleas,Parcial,en el dia de hoy contamos con asamblea
+22-04-2025,Todos,611,Cliente,Aumento de tráfico,Parcial,"Inconvenientes entre 17:30 y 18hs con estacionamiento tarifacdo, 226 y compras web, entre otros, generó gran cola de llamadas."
+23-04-2025,Aguada,Todos,Accesa,Asambleas,Parcial,Asambleas gremiales
+24-04-2025,Castillos,Todos,Accesa,Asambleas,Parcial,Asamblea gremiales
+25-04-2025,Paysandú,Todos,Accesa,Asambleas,Parcial,Asambleas gremiales
+29-04-2025,Todos,Todos,Accesa,Conectividad,Parcial,"Trabajos en la Red de Accesa, desde las 23 hs del 29/04 hasta las 00:51 hs del 30/04.	"
+30-04-2025,Aguada,Todos,Accesa,Incidencia externa,Total,Evacuacion por alarma de 14:45 a 15:05
