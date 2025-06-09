@@ -5,6 +5,9 @@ import jwt
 import datetime
 from functools import wraps
 import json
+from google.cloud import storage
+import pandas as pd
+import io
 
 load_dotenv(dotenv_path="./Config.env")
 config = dotenv_values()
@@ -90,11 +93,43 @@ def api_upload():
 
     os.makedirs('data/input/Procesar', exist_ok=True)
 
+    os.environ["CLAVE"] = os.getenv("CLAVE")
+    storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
+    bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
+
     for i in range(1, 12):
         file = request.files.get(f'file{i}')
+
         if file:
-            filename = file.filename
-            file.save(f'data/input/Procesar/{filename}')
+            filename = file.filename.lower()
+
+            # Solo procesar archivos Excel o CSV
+            if filename.endswith(('.xls', '.xlsx')):
+                try:
+                    df = pd.read_excel(file)
+                    csv_buffer = io.StringIO()
+                    df.to_csv(csv_buffer, index=False)
+                    csv_data = csv_buffer.getvalue()
+
+                    new_filename = filename.rsplit('.', 1)[0] + ".csv"
+                    blob = bucket.blob(f"csvs/{new_filename}")
+                    blob.upload_from_string(csv_data, content_type='text/csv')
+                except Exception as e:
+                    print(f"Error procesando archivo Excel {filename}: {e}")
+                    continue
+
+            elif filename.endswith('.csv'):
+                try:
+                    blob = bucket.blob(filename)
+                    blob.upload_from_file(file, content_type='text/csv')
+                except Exception as e:
+                    print(f"Error subiendo archivo CSV {filename}: {e}")
+                    continue
+
+            else:
+                print(f"Archivo ignorado (tipo no válido): {filename}")
+                continue
+
             label = file_label_map.get(f'file{i}', {}).get('label', 'label desconocido')
             files.append({'filename': filename, 'label': label})
 
