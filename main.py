@@ -114,14 +114,16 @@ def api_upload():
                     new_filename = filename.rsplit('.', 1)[0] + ".csv"
                     blob = bucket.blob(f"csvs/{new_filename}")
                     blob.upload_from_string(csv_data, content_type='text/csv')
+                    print(f"Archivo subido: {new_filename}")
                 except Exception as e:
                     print(f"Error procesando archivo Excel {filename}: {e}")
                     continue
 
             elif filename.endswith('.csv'):
                 try:
-                    blob = bucket.blob(filename)
+                    blob = bucket.blob(f"csvs/{filename}")
                     blob.upload_from_file(file, content_type='text/csv')
+                    print(f"Archivo subido: {filename}")
                 except Exception as e:
                     print(f"Error subiendo archivo CSV {filename}: {e}")
                     continue
