@@ -1,0 +1,7 @@
+Flask
+google-cloud-storage
+openpyxl
+pandas
+PyJWT
+python-dotenv
+xlrd>=2.0.1

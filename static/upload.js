@@ -1,73 +1,122 @@
-function openFileDialog(i) {
-  const fileInput = document.getElementById(`fileInput${i}`);
-  if (fileInput) {
-    fileInput.click();
-  }
-}
+const fileListDiv = document.getElementById('fileList');
 
-// Actualiza el nombre del archivo en el input de texto y añade clases para validar
-for (let i = 1; i <= 11; i++) {
-  const fileInput = document.getElementById(`fileInput${i}`);
-  const textInput = document.getElementById(`textInput${i}`);
+document.getElementById('fileInput').addEventListener('change', () => {
+  const fileInput = document.getElementById('fileInput');
 
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files.length > 0) {
-      textInput.value = fileInput.files[0].name;
-      textInput.classList.remove('is-invalid');
-      textInput.classList.add('is-valid');
-    } else {
-      textInput.value = '';
-      textInput.classList.remove('is-valid');
-    }
+  fileListDiv.innerHTML = ''; // Limpiar lista anterior
+
+  Array.from(fileInput.files).forEach((file, index) => {
+    const div = document.createElement('div');
+    div.textContent = `${index + 1}. ${file.name}`;
+    fileListDiv.appendChild(div);
   });
-}
+});
+
+const resultadoDiv = document.getElementById('resultado');
 
 document.getElementById('btnEnviar').addEventListener('click', () => {
-  const formData = new FormData();
-  const fileLabelMap = {};
-  let valid = true;
+  const fileInput = document.getElementById('fileInput');
+  const files = fileInput.files;
+  const uploadingMessage = document.getElementById('uploadingMessage');
+  const btnEnviar = document.getElementById('btnEnviar');
 
-  for (let i = 1; i <= 11; i++) {
-    const fileInput = document.getElementById(`fileInput${i}`);
-    const textInput = document.getElementById(`textInput${i}`);
-    const label = fileInput.dataset.label;
-
-    if (!fileInput.files.length) {
-      valid = false;
-      textInput.classList.add('is-invalid');
-    } else {
-      const file = fileInput.files[0];
-      formData.append(`file${i}`, file);
-      fileLabelMap[`file${i}`] = {
-        filename: file.name,
-        label: label
-      };
-      textInput.classList.remove('is-invalid');
-      textInput.classList.add('is-valid');
-    }
-  }
-
-  if (!valid) {
-    alert('Por favor, cargá todos los archivos antes de enviar.');
+  if (files.length !== 13) {
+    alert('Por favor, seleccioná exactamente 13 archivos.');
     return;
   }
 
-  // Añadir el objeto que asocia nombres con labels como JSON
+  const formData = new FormData();
+  const fileLabelMap = {};
+
+  Array.from(files).forEach((file, i) => {
+    const key = `file${i + 1}`;
+    formData.append(key, file);
+    fileLabelMap[key] = {
+      filename: file.name,
+      label: `Archivo ${i + 1}`
+    };
+  });
+
   formData.append('fileLabelMap', JSON.stringify(fileLabelMap));
+
+  resultadoDiv.textContent = 'Subiendo archivos...';
 
   fetch('/api/upload', {
     method: 'POST',
     body: formData
   })
-  .then(response => {
-    if (!response.ok) throw new Error('Error en la carga');
-    return response.json();
-  })
-  .then(data => {
-    alert('Archivos cargados con éxito!');
-    console.log(data);
-  })
-  .catch(error => {
-    alert('Error al cargar los archivos: ' + error.message);
-  });
+    .then(response => {
+      if (!response.ok) throw new Error('Error en la carga');
+      return response.json();
+    })
+    .then(data => {
+      fileListDiv.innerHTML = '';
+      resultadoDiv.textContent = '';
+      fileInput.value = '';
+      alert('Archivos cargados con éxito!');
+      console.log(data);
+    })
+    .catch(error => {
+      alert('Error al cargar los archivos: ' + error.message);
+    })
+    .finally(() => {
+      // Ocultar mensaje y reactivar botón
+      uploadingMessage.classList.add('d-none');
+      btnEnviar.disabled = false;
+    });
+});
+
+document.getElementById('btnListar').addEventListener('click', () => {
+  resultadoDiv.innerHTML = 'Cargando archivos...';
+
+  fetch('/api/listar-archivos')
+    .then(response => {
+      if (!response.ok) throw new Error('Error al listar archivos');
+      return response.json();
+    })
+    .then(data => {
+      if (data.status === 'ok') {
+        if (data.files.length === 0) {
+          resultadoDiv.textContent = 'No hay archivos subidos.';
+        } else {
+          // Crear lista de archivos
+          const ul = document.createElement('ul');
+          data.files.forEach(file => {
+            const li = document.createElement('li');
+            li.textContent = file;
+            ul.appendChild(li);
+          });
+          resultadoDiv.innerHTML = '<strong>Archivos:</strong>';
+          resultadoDiv.appendChild(ul);
+        }
+      } else {
+        resultadoDiv.textContent = 'Error: ' + data.message;
+      }
+    })
+    .catch(error => {
+      resultadoDiv.textContent = 'Error: ' + error.message;
+    });
+});
+
+document.getElementById('btnVaciar').addEventListener('click', () => {
+  if (!confirm('¿Seguro que querés vaciar el bucket? Esta acción es irreversible.')) return;
+
+  resultadoDiv.textContent = 'Borrado en proceso...';
+
+  fetch('/api/vaciar-bucket', { method: 'POST' })
+    .then(response => {
+      if (!response.ok) throw new Error('Error al vaciar bucket');
+      return response.json();
+    })
+    .then(data => {
+      if (data.status === 'ok') {
+        resultadoDiv.textContent = '';  // Limpio el mensaje previo
+        alert('Bucket vaciado correctamente.');
+      } else {
+        resultadoDiv.textContent = 'Error: ' + data.message;
+      }
+    })
+    .catch(error => {
+      resultadoDiv.textContent = 'Error: ' + error.message;
+    });
 });

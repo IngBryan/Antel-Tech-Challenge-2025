@@ -81,11 +81,9 @@ def home():
 @app.route('/api/upload', methods=['POST'])
 @token_required
 def api_upload():
-    global file_label_map_json  # para modificar la variable global
+    global file_label_map_json
 
-    files = []
     file_label_map_str = request.form.get('fileLabelMap')
-
     try:
         file_label_map = json.loads(file_label_map_str) if file_label_map_str else {}
     except json.JSONDecodeError:
@@ -97,48 +95,84 @@ def api_upload():
     storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
     bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
 
-    for i in range(1, 12):
-        file = request.files.get(f'file{i}')
+    # vaciar bucket antes de subir nuevos archivos
+    blobs = list(bucket.list_blobs())
 
-        if file:
-            filename = file.filename.lower()
+    for blob in blobs:
+        blob.delete()
 
-            # Solo procesar archivos Excel o CSV
-            if filename.endswith(('.xls', '.xlsx')):
-                try:
-                    df = pd.read_excel(file)
-                    csv_buffer = io.StringIO()
-                    df.to_csv(csv_buffer, index=False)
-                    csv_data = csv_buffer.getvalue()
+    files_processed = []
 
-                    new_filename = filename.rsplit('.', 1)[0] + ".csv"
-                    blob = bucket.blob(f"csvs/{new_filename}")
-                    blob.upload_from_string(csv_data, content_type='text/csv')
-                    print(f"Archivo subido: {new_filename}")
-                except Exception as e:
-                    print(f"Error procesando archivo Excel {filename}: {e}")
-                    continue
+    for i, (field_name, file) in enumerate(request.files.items()):
+        filename = file.filename.lower()
 
-            elif filename.endswith('.csv'):
-                try:
-                    blob = bucket.blob(f"csvs/{filename}")
-                    blob.upload_from_file(file, content_type='text/csv')
-                    print(f"Archivo subido: {filename}")
-                except Exception as e:
-                    print(f"Error subiendo archivo CSV {filename}: {e}")
-                    continue
+        # Procesar Excel
+        if filename.endswith(('.xls', '.xlsx')):
+            try:
+                df = pd.read_excel(file)
+                csv_buffer = io.StringIO()
+                df.to_csv(csv_buffer, index=False)
+                csv_data = csv_buffer.getvalue()
 
-            else:
-                print(f"Archivo ignorado (tipo no válido): {filename}")
+                new_filename = filename.rsplit('.', 1)[0] + ".csv"
+                blob = bucket.blob(f"{os.getenv("RUTA_ARCHIVO")}{new_filename}")
+                blob.upload_from_string(csv_data, content_type='text/csv')
+                print(f"Archivo subido: {new_filename}")
+                filename = new_filename
+            except Exception as e:
+                print(f"Error procesando archivo Excel {filename}: {e}")
                 continue
 
-            label = file_label_map.get(f'file{i}', {}).get('label', 'label desconocido')
-            files.append({'filename': filename, 'label': label})
+        elif filename.endswith('.csv'):
+            try:
+                blob = bucket.blob(f"{os.getenv("RUTA_ARCHIVO")}{filename}")
+                blob.upload_from_file(file, content_type='text/csv')
+                print(f"Archivo subido: {filename}")
+            except Exception as e:
+                print(f"Error subiendo archivo CSV {filename}: {e}")
+                continue
+        else:
+            print(f"Archivo ignorado (tipo no válido): {filename}")
+            continue
 
-    # Actualizo la variable global
+        # Tomar label del JSON enviado, si lo hay
+        label_info = file_label_map.get(field_name)
+        label = label_info.get('label') if label_info else labels[i] if i < len(labels) else 'label desconocido'
+
+        files_processed.append({'filename': filename, 'label': label})
+
     file_label_map_json = file_label_map
 
-    return jsonify({'status': 'ok', 'files_received': files})
+    return jsonify({'status': 'ok', 'files_received': files_processed})
+
+@app.route('/api/listar-archivos')
+@token_required
+def listar_archivos():
+    try:
+        storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
+        bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
+        blobs = bucket.list_blobs()
+
+        archivos = [blob.name for blob in blobs]
+
+        return jsonify({'status': 'ok', 'files': archivos})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/vaciar-bucket', methods=['POST'])
+@token_required
+def vaciar_bucket():
+    try:
+        storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
+        bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
+        blobs = list(bucket.list_blobs())
+
+        for blob in blobs:
+            blob.delete()
+
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
