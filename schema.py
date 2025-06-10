@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional, Union, Set
+from typing import List, Optional, Union, Set, Tuple
 from pydantic import BaseModel, Field, ConfigDict
 import json
 
@@ -11,23 +11,24 @@ class Incidencia(BaseModel):
 
 class Reclamos(BaseModel):
     # campania: str = Field(description="Por ejemplo Reclamos_611")
-    total_llamadas: int = Field(
-        title="",
-        description="Total cantidad de llamadas al Sistema de Reclamos de ANTEL. Se obtiene ",
+    manejo: int = Field(
+        title="Manejo",
+        description='Total cantidad de llamadas al Sistema de Reclamos de ANTEL. Se obtiene de la columna "Manejo"',
     )
-    tiempo_total: str = Field(
-        title="", description="Tiempo total de reclamos en formato hh:mm:ss"
+    manejo_total: str = Field(
+        title="Manejo Total",
+        description='Se obtiene en la columna "Manejo total"',
     )
 
 
-class MotivosIZI611(BaseModel):
+class MotivoIZI611(BaseModel):
     nombre_de_codigo_de_conclusion: str = Field(
         title="Nombre de código de conclusión",
-        description='Se obtiene del archivo en la columna "Nombre de código de conclusión", por ejemplo "Información General - 611", "Cliente no responde - 611", "Facturacion - 611"',
+        description='Se obtiene en la columna "Nombre de código de conclusión", por ejemplo "Información General - 611", "Cliente no responde - 611", "Facturacion - 611"',
     )
     manejo: int = Field(
         title="Manejo",
-        description='Se obtiene del archivo en partir de la columna "Manejo". Cuidado, no te confundas con otras columnas de nombre similar!.',
+        description='Se obtiene en la columna "Manejo"',
     )
 
 
@@ -90,25 +91,95 @@ class Salientes(BaseModel):
         description="Total de llamadas salientes respecto a MOVIL_Contratos. Se obtiene de la columna “Saliente”."
     )
     movil_prepagos: int = Field(
-        description="Total de llamadas salientes respecto a MOVIL_Prepagos. Se obtiene de la columna “Saliente”"
+        description="Total de llamadas salientes respecto a MOVIL_Prepagos. Se obtiene de la columna “Saliente”."
     )
     movil_prioritarios: int = Field(
-        description="Total de llamadas salientes respecto a MOVIL_Prioritarios. Se obtiene de la columna “Saliente”"
+        description="Total de llamadas salientes respecto a MOVIL_Prioritarios. Se obtiene de la columna “Saliente”."
     )
     salientes_movil: int = Field(
-        description="Total de llamadas salientes respecto a Salientes_movil. Se obtiene de la columna “Saliente”"
+        description="Total de llamadas salientes respecto a Salientes_movil. Se obtiene de la columna “Saliente”."
     )
+
+    @property
+    def total(self):
+        return (
+            self.movil_contratos
+            + self.movil_prepagos
+            + self.movil_prioritarios
+            + self.salientes_movil
+        )
+
+
+class MotivoContacto(BaseModel):
+    nombre_cola: str = Field(
+        title="Nombre de cola",
+        description='Se obtiene de la columna "Nombre de cola". Por ejemplo "MOVIL_Contrato", "MOVIL_Prepago", "MOVIL_Prioritario',
+    )
+    nombre_de_codigo_de_conclusion: str = Field(
+        title="Nombre de código de conclusión",
+        description='Se obtiene de la columna "Nombre de código de conclusión", por ejemplo "Información General - 611", "Cliente no responde - 611", "Facturacion - 611".',
+    )
+    manejo: int = Field(
+        title="Manejo",
+        description='Se obtiene de la columna "Manejo"',
+    )
+
+
+class MotivosIZI611(BaseModel):
+    motivosIzi611: list[MotivoIZI611] = Field(
+        description='Lista de valores de la columna "Manejo" para cada "Nombre de código de conclusión". Las filas en este archivo estan duplicadas. Se debe filtrar los datos por la columna “Acumulado o detallado” para utilizar solo "Detallado"'
+    )
+
+    @property
+    def total(self):
+        sum([m.manejo for m in self.motivosIzi611])
+
+
+class Incidencias(BaseModel):
+    incidencias: list[Incidencia] = Field(description="Incidencias relevantes.")
+
+
+class MotivosContacto(BaseModel):
+    motivos_contactos: list[MotivoContacto] = Field(
+        description='Lista de motivos de contacto ordenados de forma ascendente según \'Nombre de cola\'. Tener en cuenta solo las filas cuyo valor en la columna "Acumulado o detallado" sea "Detallado"'
+    )
+
+
+class Automatismos(BaseModel):
+    exito: int = Field(
+        description='Cantidad total de éxito según la columna "Total correcto"'
+    )
+    error: int = Field(
+        description='Cantidad total de errores según la columna "Total error"'
+    )
+
+    @property
+    def pexito(self):
+        return self.exito / self.total
+
+    @property
+    def perror(self):
+        return self.error / self.total
+
+    @property
+    def total(self):
+        return self.exito + self.error
+
+    @property
+    def ptotal(self):
+        return 1.0
 
 
 class Reporte(BaseModel):
     antel_movil: AntelMovil611
-    incidencias: list[Incidencia] = Field(description="Incidencias relevantes.")
+    incidencias: Incidencias
     reclamos: Reclamos
-    motivosIzi611: list[MotivosIZI611] = Field(
-        description='Lista no vacia!. Lista de valores de la columna "Manejo" para cada \'Nombre de código de conclusión\'. Esta lista se obtiene a partir del archivo "2025-05-19 Rendimiento de conclusión - tipif. Reclamos"'
-    )
+    motivosIzi611: MotivosIZI611
+    motivos_contacto: MotivosContacto
     whatsapp: Whatsapp
     salientes: Salientes
+    automatismos: Automatismos
 
 
-print(Reporte.model_json_schema())
+if __name__ == "__main__":
+    print(Reporte.model_json_schema())
