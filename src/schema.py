@@ -3,7 +3,7 @@ from dotenv import load_dotenv,dotenv_values
 from pydantic import BaseModel, Field
 
 
-load_dotenv(dotenv_path="Config.env")
+load_dotenv(dotenv_path="../Config.env")
 config = dotenv_values()
 
 nivel_str = os.getenv("NIVEL_DEL_SERVICIO")

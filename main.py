@@ -8,7 +8,7 @@ import json
 from google.cloud import storage
 import pandas as pd
 import io
-from ai import armar_reporte
+from src.ai import armar_reporte
 
 load_dotenv(dotenv_path="Config.env")
 config = dotenv_values()
@@ -88,7 +88,7 @@ def api_upload():
     except json.JSONDecodeError:
         return jsonify({'status': 'error', 'message': 'Error al parsear fileLabelMap'}), 400
 
-    os.makedirs('../data/input/Procesar', exist_ok=True)
+    os.makedirs('data/input/Procesar', exist_ok=True)
 
     os.environ["CLAVE"] = os.getenv("CLAVE")
     storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
