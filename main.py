@@ -9,6 +9,7 @@ from google.cloud import storage
 import pandas as pd
 import io
 from src.ai import armar_reporte
+from src.reporte_pdf import generar_pdf
 
 load_dotenv(dotenv_path="Config.env")
 config = dotenv_values()
@@ -164,7 +165,7 @@ def vaciar_bucket():
     try:
         storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
         bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
-        blobs = list(bucket.list_blobs())
+        blobs = bucket.list_blobs(prefix=os.getenv("RUTA_ARCHIVO"))
 
         for blob in blobs:
             blob.delete()
@@ -176,20 +177,27 @@ def vaciar_bucket():
 @app.route('/api/generar-reporte', methods=['POST'])
 def generar_reporte():
     try:
-        json_data  = armar_reporte()
+        report_data  = armar_reporte()
 
-        #ARMAR REPORTE ACA y llamarlo reporte_armado
+        pdf_bytes = generar_pdf(report_data)
 
         storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
         bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
 
-        # subir reporte.json al bucket
-        blob = bucket.blob("reportes/reporte_generado.json")
+        blobs = bucket.list_blobs(prefix=os.getenv("RUTA_ARCHIVO"))
+
+        for blob in blobs:
+            # Ignorar si es una "carpeta vacía" (GCS trata carpetas como blobs con / al final)
+            if blob.name.endswith("/"):
+                continue
+
+            nuevo_nombre = blob.name.replace(os.getenv("RUTA_ARCHIVO"), os.getenv("RUTA_PROCESADOS"), 1)
+            nuevo_blob = bucket.copy_blob(blob, bucket, new_name=nuevo_nombre)
+            blob.delete()
+
+        blob = bucket.blob("reportes/reporte_generado.pdf")
         
-        #blob.upload_from_string(
-        #    json.dumps(reporte_armado, indent=2, ensure_ascii=False),
-        #    content_type="application/json"
-        #)
+        blob.upload_from_string(pdf_bytes, content_type="application/pdf")
 
         return jsonify({'status': 'ok'})
     except Exception as e:
