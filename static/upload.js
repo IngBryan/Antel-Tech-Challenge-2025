@@ -20,8 +20,13 @@ document.getElementById('btnEnviar').addEventListener('click', () => {
   const uploadingMessage = document.getElementById('uploadingMessage');
   const btnEnviar = document.getElementById('btnEnviar');
 
-  if (files.length !== 13) {
-    alert('Por favor, seleccioná exactamente 13 archivos.');
+  //if (files.length !== 13) {
+  //  alert('Por favor, seleccioná exactamente 13 archivos.');
+  //  return;
+  //}
+
+  if (files.length == 0) {
+    alert('Por favor, seleccioná algún archivo');
     return;
   }
 
@@ -118,5 +123,28 @@ document.getElementById('btnVaciar').addEventListener('click', () => {
     })
     .catch(error => {
       resultadoDiv.textContent = 'Error: ' + error.message;
+    });
+});
+
+document.getElementById('btnReporte').addEventListener('click', () => {
+  resultadoDiv.textContent = 'Generando reporte...';
+
+  fetch('/api/generar-reporte', { method: 'POST' })
+    .then(response => {
+      if (!response.ok) throw new Error('Error al generar el reporte');
+      return response.json();
+    })
+    .then(data => {
+      if (data.status === 'ok') {
+        resultadoDiv.textContent = '';
+        alert('Reporte generado con éxito!');
+        console.log(data.resultado);
+      } else {
+        resultadoDiv.textContent = '';
+        alert('Error: ' + data.message);
+      }
+    })
+    .catch(error => {
+      alert('Error: ' + error.message);
     });
 });

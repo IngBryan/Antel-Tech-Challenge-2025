@@ -8,6 +8,7 @@ import json
 from google.cloud import storage
 import pandas as pd
 import io
+from ai import armar_reporte
 
 load_dotenv(dotenv_path="./Config.env")
 config = dotenv_values()
@@ -94,10 +95,10 @@ def api_upload():
     bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
 
     # vaciar bucket antes de subir nuevos archivos
-    blobs = list(bucket.list_blobs())
-
-    for blob in blobs:
-        blob.delete()
+    #blobs = list(bucket.list_blobs())
+#
+    #for blob in blobs:
+    #    blob.delete()
 
     files_processed = []
 
@@ -167,6 +168,28 @@ def vaciar_bucket():
 
         for blob in blobs:
             blob.delete()
+
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/generar-reporte', methods=['POST'])
+def generar_reporte():
+    try:
+        json_data  = armar_reporte()
+
+        #ARMAR REPORTE ACA y llamarlo reporte_armado
+
+        storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
+        bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
+
+        # subir reporte.json al bucket
+        blob = bucket.blob("reportes/reporte_generado.json")
+        
+        #blob.upload_from_string(
+        #    json.dumps(reporte_armado, indent=2, ensure_ascii=False),
+        #    content_type="application/json"
+        #)
 
         return jsonify({'status': 'ok'})
     except Exception as e:
