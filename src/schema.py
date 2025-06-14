@@ -11,7 +11,6 @@ nivel_servicio = tuple(map(int, nivel_str.split("/"))) #(80,20)
 
 
 
-
 class Incidencia(BaseModel):
     fecha: str = Field(description="Fecha de incidencia en formato XX-XX-XX.")
     motivo: str = Field(description="Resumen del motivo de la incidencia.")
@@ -50,16 +49,16 @@ class AntelMovil611(BaseModel):
     llamadas_abandonadas: int = Field(
         description="se calcula a partir de “Listado de llamadas Atendidas y Abandonadas - Habilidad/Fecha” como la suma total de los valores de la columna “Abandonada”. Observar que este valor debe coincidir con el que se encuentra en la columna “Abandonadas” a partir de “Habilidad” en la fila “ANTEL MOVIL”."
     )
-    porcentaje_llamadas_no_atendidas: float = Field(
-        "se obtiene a partir de “Habilidad” en la fila “ANTEL MOVIL” columna “Indice de Abandono %”"
+    porcentaje_llamadas_no_atendidas_global: float = Field(
+        description="La operacion es (Llamdas Abandonadas / Llamadas Ofrecidas)x100 ."
     )
-    cumplimiento_servicio: float = Field(
-        description="Porcentaje de cumplimiento del nivel de servicio acordado, donde "+str(nivel_servicio[0])+"%"+ "de nivel de servicio equivale al 100% de cumplimiento. Operación: Nivel de servicio /"+str(nivel_servicio[0])
+    cumplimiento_servicio_global: float = Field(
+        description="Porcentaje de cumplimiento del nivel de servicio acordado, donde "+str(nivel_servicio[0])+"%"+ "de nivel de servicio equivale al 100% de cumplimiento. Operación: (Nivel de servicio /"+str(nivel_servicio[0])+")x100"#+"Donde Nivel de servicio es Llamadas atendidas dentro del umbral respecto a las llamadas atendidas. En este caso el umbral son"+ str(nivel_servicio[1]) +"segundos. El nivel de serivicio=Llamadas atendidas dentro del umbral/Llamadas atendidas"
     )
-    indice_respuesta: float = Field(
+    indice_respuesta_global: float = Field(
         description="(Llamadas atendidas totales / Llamadas al servicio) %.  Observar que este valor debe coincidir con el que se encuentra en la columna “Indice de respuesta %” a partir de “Habilidad” en la fila “ANTEL MOVIL”."
     )
-    trsac: int = Field(
+    trsac_global: int = Field(
         description="Demora de atención. La cantidad de segundos que un cliente espera en promedio en ser atendido. Operación: Total de demora en atender(segundos) / Total de llamadas atendidas."
     )
     promedio_operacion: float = Field(

@@ -12,7 +12,7 @@ from vertexai import init
 from vertexai.generative_models import GenerativeModel, Part
 from google.cloud import storage
 
-from .schema import (
+from schema import (
     AntelMovil611,
     Reclamos,
     MotivosIZI611,
