@@ -3,7 +3,7 @@ from vertexai.preview.generative_models import GenerativeModel
 import os
 from dotenv import load_dotenv,dotenv_values
 
-load_dotenv(dotenv_path="./Config.env")
+load_dotenv(dotenv_path="Config.env")
 config = dotenv_values()
 ruta_json=os.getenv('CLAVE')
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ruta_json
