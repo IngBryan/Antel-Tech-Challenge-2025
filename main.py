@@ -13,8 +13,6 @@ load_dotenv(dotenv_path="./Config.env")
 config = dotenv_values()
 USUARIO = os.getenv('USUARIO')
 CONTRASENA = os.getenv('CONTRASENA')
-print(f"USUARIO = {USUARIO}")
-print(f"CONTRASENA = {CONTRASENA}")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'trooperx30'

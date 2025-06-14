@@ -1,7 +1,15 @@
-from enum import Enum
-from typing import List, Optional, Union, Set, Tuple
-from pydantic import BaseModel, Field, ConfigDict
-import json
+import os
+from dotenv import load_dotenv,dotenv_values
+from pydantic import BaseModel, Field
+
+
+load_dotenv(dotenv_path="./Config.env")
+config = dotenv_values()
+
+nivel_str = os.getenv("NIVEL_DEL_SERVICIO")
+nivel_servicio = tuple(map(int, nivel_str.split("/"))) #(80,20)
+
+
 
 
 class Incidencia(BaseModel):
@@ -46,7 +54,7 @@ class AntelMovil611(BaseModel):
         "se obtiene a partir de “Habilidad” en la fila “ANTEL MOVIL” columna “Indice de Abandono %”"
     )
     cumplimiento_servicio: float = Field(
-        description="Porcentaje de cumplimiento del nivel de servicio acordado, donde 80% de nivel de servicio equivale al 100% de cumplimiento. Operación: Nivel de servicio / 80%."
+        description="Porcentaje de cumplimiento del nivel de servicio acordado, donde "+str(nivel_servicio[0])+"%"+ "de nivel de servicio equivale al 100% de cumplimiento. Operación: Nivel de servicio /"+str(nivel_servicio[0])
     )
     indice_respuesta: float = Field(
         description="(Llamadas atendidas totales / Llamadas al servicio) %.  Observar que este valor debe coincidir con el que se encuentra en la columna “Indice de respuesta %” a partir de “Habilidad” en la fila “ANTEL MOVIL”."

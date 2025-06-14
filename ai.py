@@ -80,7 +80,7 @@ def armar_reporte() -> Reporte:
             ],
             "reclamos",
         ),
-        (Incidencias, ["ReporteBitácoraDeIncidencias19_5_2025"], "incidencias"),
+        (Incidencias, ["ReporteBitácoraDeIncidencias"], "incidencias"),
         (
             MotivosIZI611,
             ["Rendimiento de conclusión - tipif. Reclamos"],
