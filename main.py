@@ -109,16 +109,43 @@ def api_upload():
         # Procesar Excel
         if filename.endswith(('.xls', '.xlsx')):
             try:
-                df = pd.read_excel(file)
-                csv_buffer = io.StringIO()
-                df.to_csv(csv_buffer, index=False)
-                csv_data = csv_buffer.getvalue()
+                if filename.lower().startswith("informe móvil"):
+                    # Abrir el archivo con múltiples hojas
+                    xls = pd.ExcelFile(file)
 
-                new_filename = filename.rsplit('.', 1)[0] + ".csv"
-                blob = bucket.blob(f"{os.getenv("RUTA_ARCHIVO")}{new_filename}")
-                blob.upload_from_string(csv_data, content_type='text/csv')
-                print(f"Archivo subido: {new_filename}")
-                filename = new_filename
+                    hojas_a_procesar = {2: 1, 4: 3}  # nombre_logico: índice_hoja
+                    for nro_hoja, index_hoja in hojas_a_procesar.items():
+                        try:
+                            df = pd.read_excel(xls, sheet_name=index_hoja)
+                            csv_buffer = io.StringIO()
+                            df.to_csv(csv_buffer, index=False)
+                            csv_data = csv_buffer.getvalue()
+
+                            base_name = filename.rsplit('.', 1)[0]
+                            if nro_hoja == 2:
+                                new_filename = f"{base_name}_Llamadas.csv"
+                            else:
+                                new_filename = f"{base_name}_Excepción_20%.csv"
+                            blob = bucket.blob(f"{os.getenv('RUTA_ARCHIVO')}{new_filename}")
+                            blob.upload_from_string(csv_data, content_type='text/csv')
+                            print(f"Archivo subido: {new_filename}")
+                        except Exception as e:
+                            print(f"Error procesando hoja {nro_hoja} de {filename}: {e}")
+                            continue
+
+                else:
+                    # Leer solo la primera hoja (comportamiento por defecto)
+                    df = pd.read_excel(file)
+                    csv_buffer = io.StringIO()
+                    df.to_csv(csv_buffer, index=False)
+                    csv_data = csv_buffer.getvalue()
+
+                    new_filename = filename.rsplit('.', 1)[0] + ".csv"
+                    blob = bucket.blob(f"{os.getenv('RUTA_ARCHIVO')}{new_filename}")
+                    blob.upload_from_string(csv_data, content_type='text/csv')
+                    print(f"Archivo subido: {new_filename}")
+                    filename = new_filename
+
             except Exception as e:
                 print(f"Error procesando archivo Excel {filename}: {e}")
                 continue
