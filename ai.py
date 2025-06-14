@@ -1,9 +1,12 @@
 from google.cloud import aiplatform
 from vertexai.preview.generative_models import GenerativeModel
 import os
+from dotenv import load_dotenv,dotenv_values
 
-
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "ai.json"
+load_dotenv(dotenv_path="./Config.env")
+config = dotenv_values()
+ruta_json=os.getenv('CLAVE')
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ruta_json
 
 from vertexai import init
 from vertexai.generative_models import GenerativeModel, Part
