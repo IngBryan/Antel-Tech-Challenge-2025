@@ -5,6 +5,8 @@ from dotenv import load_dotenv,dotenv_values
 import unicodedata
 from io import StringIO
 import pandas as pd
+from datetime import timedelta
+from io import BytesIO
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "../Config.env"))
 config = dotenv_values()
 ruta_json = os.getenv("CLAVE")
@@ -45,7 +47,10 @@ def buscar_y_descargar_archivos(bucket_name, prefix, keywords):
         for keyword in keywords:
             if encontrados[keyword] is None and normalizar(keyword) in normalizar(blob.name):
                 print(f"Archivo encontrado para '{keyword}': {blob.name}")
-                encontrados[keyword] = blob.download_as_text()
+                encontrados[keyword] = {
+                    "name": blob.name,
+                    "content": blob.download_as_text()
+                }
         if all(v is not None for v in encontrados.values()):
             break
 
@@ -63,23 +68,28 @@ def armar_reporte() -> Reporte:
     keywords = ["excepcion_20%", "sites_services_inf_recover_DateDay_output"]
 
     archivos_texto = buscar_y_descargar_archivos(bucket_name, prefix, keywords)
-    df1 = pd.read_csv(StringIO(archivos_texto["sites_services_inf_recover_DateDay_output"]), header=1)
-    df2 = pd.read_csv(StringIO(archivos_texto["excepcion_20%"]))
 
-    # Aseguramos nombres en minúsculas y sin tildes
+    df1 = pd.read_csv(StringIO(archivos_texto["sites_services_inf_recover_DateDay_output"]["content"]), header=1)
+    df2 = pd.read_csv(StringIO(archivos_texto["excepcion_20%"]["content"]))
+
+    # Normalizar nombres
     df1.columns = [normalizar(c).strip().lower() for c in df1.columns]
     df2.columns = [normalizar(c).strip().lower() for c in df2.columns]
 
-    # Agrupamos por día
+    # Agrupar df1 por fecha
     df1_grouped = df1.groupby('fecha')['ofrecidas'].sum()
 
-    # Convertimos 'mes' a fecha si está en ese nombre
+    # Convertir columna mes a datetime
     df2['mes'] = pd.to_datetime(df2['mes'], errors='coerce')
 
+    # Ordenar por fecha
+    df2 = df2.sort_values("mes").reset_index(drop=True)
+    # Calcular ofrecidas y promedio si ofrecidas está vacía
     for idx, row in df2.iterrows():
         if pd.isna(row['ofrecidas']):
-            if not pd.isna(row['mes']):
-                dia = row['mes'].day
+            fecha = row['mes']
+            if not pd.isna(fecha):
+                dia = fecha.day
                 if dia in df1_grouped.index:
                     df2.at[idx, 'ofrecidas'] = df1_grouped[dia]
                 else:
@@ -87,7 +97,32 @@ def armar_reporte() -> Reporte:
             else:
                 df2.at[idx, 'ofrecidas'] = 0
 
-    print(df2.to_csv(index=False))
+            # Calcular promedio solo si ofrecidas se calculó recién
+            ofrecidas_actual = float(df2.at[idx, 'ofrecidas'])
+            fechas_pasadas = [fecha - timedelta(days=d) for d in [7, 14, 21, 28]]
+            ofrecidas_pasadas = []
+
+            for f in fechas_pasadas:
+                match = df2[df2['mes'] == f]
+                if not match.empty and not pd.isna(match.iloc[0]['ofrecidas']):
+                    ofrecidas_pasadas.append(float(match.iloc[0]['ofrecidas']))
+
+            if ofrecidas_pasadas:
+                promedio_pasado = sum(ofrecidas_pasadas) / len(ofrecidas_pasadas)
+                variacion = (ofrecidas_actual / promedio_pasado - 1) if promedio_pasado != 0 else None
+            else:
+                variacion = None
+
+            df2.at[idx, 'Promeido'] = round(variacion*100)
+
+    storage_client = storage.Client(project="accesa-equipo2")
+    bucket = storage_client.bucket(bucket_name)
+
+    nombre_blob = archivos_texto["excepcion_20%"]["name"]
+    blob = bucket.blob(nombre_blob)
+
+    csv_str = df2.to_csv(index=False)
+    blob.upload_from_string(csv_str, content_type="text/csv")
 
     # Listar todos los archivos JSON en el bucket con el prefijo
     bucket = storage_client.bucket(bucket_name)
@@ -190,7 +225,7 @@ def armar_reporte() -> Reporte:
 
 if __name__ == "__main__":
     reporte = armar_reporte()
-    print(reporte)
+    #print(reporte)
 
 # Convertimos cada URI en un Part con el mime_type correcto para JSON
 # parts = [Part.from_uri(uri, mime_type="text/csv") for uri in json_uris]
