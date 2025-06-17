@@ -16,7 +16,7 @@ from vertexai import init
 from vertexai.generative_models import GenerativeModel, Part
 from google.cloud import storage
 
-from schema import (
+from src.schema import (
     AntelMovilGlobal,
     AntelMovilNoGlobal,
     Reclamos,

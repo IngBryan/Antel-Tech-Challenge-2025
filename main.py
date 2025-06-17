@@ -10,8 +10,11 @@ import pandas as pd
 import io
 from src.ai import armar_reporte
 from src.reporte_pdf import generar_pdf
+from flask import send_file
+from pathlib import Path
 
-load_dotenv(dotenv_path="Config.env")
+load_dotenv(dotenv_path=Path(__file__).parents[1] / "Config.env")
+ruta_clave = Path(os.getenv("CLAVE"))
 config = dotenv_values()
 USUARIO = os.getenv('USUARIO')
 CONTRASENA = os.getenv('CONTRASENA')
@@ -91,8 +94,7 @@ def api_upload():
 
     os.makedirs('data/input/Procesar', exist_ok=True)
 
-    os.environ["CLAVE"] = os.getenv("CLAVE")
-    storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
+    storage_client = storage.Client.from_service_account_json(str(ruta_clave))
     bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
 
     # vaciar bucket antes de subir nuevos archivos
@@ -176,7 +178,7 @@ def api_upload():
 @token_required
 def listar_archivos():
     try:
-        storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
+        storage_client = storage.Client.from_service_account_json(str(ruta_clave))
         bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
         blobs = bucket.list_blobs()
 
@@ -190,7 +192,7 @@ def listar_archivos():
 @token_required
 def vaciar_bucket():
     try:
-        storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
+        storage_client = storage.Client.from_service_account_json(str(ruta_clave))
         bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
         blobs = bucket.list_blobs(prefix=os.getenv("RUTA_ARCHIVO"))
 
@@ -204,29 +206,37 @@ def vaciar_bucket():
 @app.route('/api/generar-reporte', methods=['POST'])
 def generar_reporte():
     try:
-        report_data  = armar_reporte()
+        #report_data  = armar_reporte()
+#
+        #pdf_bytes = generar_pdf(report_data)
+#
+        #storage_client = storage.Client.from_service_account_json(str(ruta_clave))
+        #bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
+#
+        #blobs = bucket.list_blobs(prefix=os.getenv("RUTA_ARCHIVO"))
+#
+        #for blob in blobs:
+        #    # Ignorar si es una "carpeta vacía" (GCS trata carpetas como blobs con / al final)
+        #    if blob.name.endswith("/"):
+        #        continue
+#
+        #    nuevo_nombre = blob.name.replace(os.getenv("RUTA_ARCHIVO"), os.getenv("RUTA_PROCESADOS"), 1)
+        #    nuevo_blob = bucket.copy_blob(blob, bucket, new_name=nuevo_nombre)
+        #    blob.delete()
+#
+        #blob = bucket.blob("reportes/reporte_generado.pdf")
+        #
+        #blob.upload_from_string(pdf_bytes, content_type="application/pdf")
 
+        report_data = armar_reporte()
         pdf_bytes = generar_pdf(report_data)
 
-        storage_client = storage.Client.from_service_account_json(os.getenv("CLAVE"))
-        bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
-
-        blobs = bucket.list_blobs(prefix=os.getenv("RUTA_ARCHIVO"))
-
-        for blob in blobs:
-            # Ignorar si es una "carpeta vacía" (GCS trata carpetas como blobs con / al final)
-            if blob.name.endswith("/"):
-                continue
-
-            nuevo_nombre = blob.name.replace(os.getenv("RUTA_ARCHIVO"), os.getenv("RUTA_PROCESADOS"), 1)
-            nuevo_blob = bucket.copy_blob(blob, bucket, new_name=nuevo_nombre)
-            blob.delete()
-
-        blob = bucket.blob("reportes/reporte_generado.pdf")
-        
-        blob.upload_from_string(pdf_bytes, content_type="application/pdf")
-
-        return jsonify({'status': 'ok'})
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name='reporte_mensual.pdf'
+        )
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 

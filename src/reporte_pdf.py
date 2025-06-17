@@ -5,7 +5,7 @@ from reportlab.lib.units import cm
 from datetime import datetime
 
 from src.schema import (
-    Reporte, AntelMovil611, Incidencias, Incidencia, Reclamos,
+    Reporte, Incidencias, Incidencia, Reclamos,
     MotivosIZI611, MotivoIZI611, MotivosContacto, MotivoContacto,
     Whatsapp, Salientes, Automatismos
 )
@@ -32,14 +32,14 @@ def generar_pdf(reporte: Reporte) -> bytes:
 
     # Antel Móvil
     write_line("ANTEL MÓVIL - 611", bold=True)
-    am = reporte.antel_movil
-    write_line(f"Llamadas al servicio: {am.llamadas_al_servicio}")
-    write_line(f"Llamadas atendidas: {am.llamadas_atendidas_totales}")
-    write_line(f"Llamadas abandonadas: {am.llamadas_abandonadas}")
-    write_line(f"Índice de respuesta: {am.indice_respuesta:.2f}%")
-    write_line(f"TRSAC: {am.trsac} segundos")
-    write_line(f"Cumplimiento del servicio: {am.cumplimiento_servicio:.2f}%")
-    write_line(f"Congestión: {am.congestion}")
+    #am = reporte.antel_movil
+    #write_line(f"Llamadas al servicio: {am.llamadas_al_servicio}")
+    #write_line(f"Llamadas atendidas: {am.llamadas_atendidas_totales}")
+    #write_line(f"Llamadas abandonadas: {am.llamadas_abandonadas}")
+    #write_line(f"Índice de respuesta: {am.indice_respuesta:.2f}%")
+    #write_line(f"TRSAC: {am.trsac} segundos")
+    #write_line(f"Cumplimiento del servicio: {am.cumplimiento_servicio:.2f}%")
+    #write_line(f"Congestión: {am.congestion}")
 
     write_line("-" * 80)
 

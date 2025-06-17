@@ -132,19 +132,23 @@ document.getElementById('btnReporte').addEventListener('click', () => {
   fetch('/api/generar-reporte', { method: 'POST' })
     .then(response => {
       if (!response.ok) throw new Error('Error al generar el reporte');
-      return response.json();
+      return response.blob();
     })
-    .then(data => {
-      if (data.status === 'ok') {
-        resultadoDiv.textContent = '';
-        alert('Reporte generado con éxito!');
-        console.log(data.resultado);
-      } else {
-        resultadoDiv.textContent = '';
-        alert('Error: ' + data.message);
-      }
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'reporte_mensual.pdf'; // nombre sugerido
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url); // limpieza
+
+      resultadoDiv.textContent = '';
+      alert('Reporte generado con éxito!');
     })
     .catch(error => {
+      resultadoDiv.textContent = '';
       alert('Error: ' + error.message);
     });
 });
