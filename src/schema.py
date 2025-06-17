@@ -1,5 +1,5 @@
 import os
-from dotenv import load_dotenv,dotenv_values
+from dotenv import load_dotenv, dotenv_values
 from pydantic import BaseModel, Field
 
 
@@ -7,7 +7,8 @@ load_dotenv(dotenv_path="../Config.env")
 config = dotenv_values()
 
 nivel_str = os.getenv("NIVEL_DEL_SERVICIO")
-nivel_servicio = tuple(map(int, nivel_str.split("/"))) #(80,20)
+nivel_servicio = tuple(map(int, nivel_str.split("/")))  # (80,20)
+
 
 class Incidencia(BaseModel):
     fecha: str = Field(description="Fecha de incidencia en formato XX-XX-XX.")
@@ -37,61 +38,68 @@ class MotivoIZI611(BaseModel):
     )
 
 
-class AntelMovil611(BaseModel):
-    llamadas_al_servicio: int = Field(
+class AntelMovilGlobal(BaseModel):
+    # SIN EXCEPCION
+    llamadas_al_servicio_global: int = Field(
         description="Se calcula a partir de “Listado de llamadas Atendidas y Abandonadas - Habilidad/Fecha” como la suma total de los valores de la columna “Ofrecidas”. Observar que este valor debe coincidir con el que se encuentra en la columna “Ofrecidas” a partir de “Habilidad” en la fila “ANTEL MOVIL”"
     )
-    llamadas_atendidas_totales: int = Field(
+    llamadas_atendidas_totales_global: int = Field(
         description="se calcula a partir de “Listado de llamadas Atendidas y Abandonadas - Habilidad/Fecha” como la suma total de los valores de la columna “Atendidas”.  Observar que este valor debe coincidir con el que se encuentra en la columna “Contestadas” a partir de “Habilidad” en la fila “ANTEL MOVIL”."
     )
-    llamadas_abandonadas: int = Field(
+    llamadas_abandonadas_global: int = Field(
         description="se calcula a partir de “Listado de llamadas Atendidas y Abandonadas - Habilidad/Fecha” como la suma total de los valores de la columna “Abandonada”. Observar que este valor debe coincidir con el que se encuentra en la columna “Abandonadas” a partir de “Habilidad” en la fila “ANTEL MOVIL”."
     )
-    """porcentaje_llamadas_no_atendidas_global: float = Field(
-        description="La operacion es (Llamdas Abandonadas / Llamadas Ofrecidas)x100 ."
-    )"""
-    porcentaje_llamadas_no_atendidas: float = Field(
-        description="Para ls siguiente operacion no se debe tener en cuenta aquellas llamadas que pasaron en un dia, el cual el promeido fue >=20%.La operacion es (Llamdas Abandonadas / Llamadas Ofrecidas)x100."
+
+    @property
+    def porcentaje_no_atendidas_global(self):
+        return self.llamadas_abandonadas_global / self.llamadas_al_servicio_global
+
+    cumplimiento_de_servicio_global: float = Field(
+        title="Cumplimiento de Servicio Global",
+        description=f"El {nivel_servicio[0]}% de nivel de servicio equivale al 100% de cumplimiento. Operación: Nivel de servicio / {nivel_servicio[0]}%.",
     )
-    cumplimiento_servicio_global: float = Field(
-        description="Porcentaje de cumplimiento del nivel de servicio acordado, donde "+str(nivel_servicio[0])+"%"+ "de nivel de servicio equivale al 100% de cumplimiento. Operación: (Nivel de servicio /"+str(nivel_servicio[0])+")x100"
+    trsac: int = Field(
+        description="Demora de atencion. La cantidad de segundos que un cliente espera en promedio en ser atendido. La operacion es: Total de demora en atender(segundos) / Total de llamadas atendidas."
     )
-    """cumplimiento_servicio: float = Field(
-        description=(
-                "Porcentaje de cumplimiento del nivel de servicio acordado, donde "
-                + str(nivel_servicio[0])
-                + "% de nivel de servicio equivale al 100% de cumplimiento. "
-                  "Operación: (Nivel de servicio / "
-                + str(nivel_servicio[0])
-                + ") x 100. "
-                  "Para este cálculo, NO considerar las llamadas correspondientes a los días "
-                  "que estén marcados en el archivo que contiene el string 'Excepción_20%', es decir, excluir esos días "
-                  "del cálculo del nivel de servicio."
-        )
-    )"""
-    indice_respuesta_global: float = Field(
-        description="(Llamadas atendidas totales / Llamadas al servicio) %.  Observar que este valor debe coincidir con el que se encuentra en la columna “Indice de respuesta %” a partir de “Habilidad” en la fila “ANTEL MOVIL”."
-    )
-    """indice_respuesta: float = Field(
-        description="(Llamadas atendidas totales / Llamadas al servicio) %.Para este cálculo, NO considerar las llamadas correspondientes a los días que estén marcados en el archivo que contiene el string 'Excepción_20%', es decir, excluir esos días del cálculo del nivel de servicio."
-    )"""
-    trsac_global: int = Field(
-        description="Demora de atención. La cantidad de segundos que un cliente espera en promedio en ser atendido. Operación: Total de demora en atender(segundos) / Total de llamadas atendidas."
-    )
-    """trsac: int = Field(
-        description="Demora de atención. La cantidad de segundos que un cliente espera en promedio en ser atendido. Operación: Total de demora en atender(segundos) / Total de llamadas atendidas.Para este cálculo, NO considerar las llamadas correspondientes a los días que estén marcados en el archivo que contiene el string 'Excepción_20%', es decir, excluir esos días del cálculo del nivel de servicio."
-    )"""
     promedio_operacion: float = Field(
-        title="Promedio Operación",
-        description="Se obtiene a partir de “Habilidad” en la fila “ANTEL MOVIL” columna “Tiempo Operación”",
+        title="Promedio Operacion",
+        description="Se obtiene a partir de “Habilidad” en la fila “ANTEL MOVIL” columna “Tiempo Operacion",
     )
     atencion: float = Field(
-        title="Tiempo de Atención",
-        description="se obtiene a partir de “Habilidad” en la fila “ANTEL MOVIL” columna “Horas Operación”",
+        title="Tiempo de Atencion",
+        description="se obtiene a partir de “Habilidad” en la fila “ANTEL MOVIL” columna “Horas Operacion",
     )
     congestion: int = Field(
-        description="Cantidad de llamadas que la central devolvió tono ocupado. Operación: Llamadas_con_tono_ocupado / Cantidad_de_intento. Se puede obtener a partir de “Reporte de Calificaciones” en la columna “611(%)” sumando la congestión de cada día, dividiéndola por la cantidad de días."
+        description="Cantidad de llamadas que la central devolvio tono ocupado. La operacion es: (Llamadas_con_tono_ocupado / Cantidad_de_intento). Se puede obtener a partir de “Reporte de Calificaciones” en la columna “611(%)” sumando la congesti0n de cada dia, dividiendola por la cantidad de dias."
     )
+
+
+class AntelMovilNoGlobal(BaseModel):
+    # CON EXCEPCION
+    llamadas_al_servicio: int = Field(description="valor de la columna “Ofrecidas”")
+    llamadas_atendidas_totales: int = Field(
+        description="valor de la columna “Atendidas”"
+    )
+    llamadas_abandonadas: int = Field(description="valor de la columna “Abandonadas”")
+    total_demora: int = Field(
+        description='Se obtiene a partir de “Habilidad” en la fila “ANTEL MOVIL” columna "Demora en Atender"'
+    )
+    cumplimiento_servicio: float = Field(
+        title="Cumplimiento de Servicio",
+        description=f'El {nivel_servicio[0]}% de nivel de servicio equivale al 100% de cumplimiento. Operación: Nivel de servicio / {nivel_servicio[0]}%."',
+    )
+
+    @property
+    def porcentaje_no_atendidas(self):
+        return self.llamadas_abandonadas / self.llamadas_al_servicio
+
+    @property
+    def indice_de_respuesta(self):
+        return self.llamadas_atendidas_totales / self.llamadas_al_servicio
+
+    @property
+    def trsac(self):
+        return self.total_demora / self.llamadas_atendidas_totales
 
 
 class Whatsapp(BaseModel):
@@ -109,7 +117,7 @@ class Whatsapp(BaseModel):
     )
     promedio: float = Field(
         title="Promedio de mensajes por interacción",
-        description="se obtiene a partir de “Resumen de Campanas Heynow” en la fila “Roaming” columna “Promedio de mensajes por interacción”",
+        description="se obtiene a partir de “Resumen de Campanas Heynow” en la fila “Roaming” columna “Promedio de mensajes por interaccion”",
     )
 
 
@@ -198,7 +206,8 @@ class Automatismos(BaseModel):
 
 
 class Reporte(BaseModel):
-    antel_movil: AntelMovil611
+    antel_movil_global: AntelMovilGlobal
+    antel_movil_no_global: AntelMovilNoGlobal
     incidencias: Incidencias
     reclamos: Reclamos
     motivosIzi611: MotivosIZI611

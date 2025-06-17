@@ -17,7 +17,8 @@ from vertexai.generative_models import GenerativeModel, Part
 from google.cloud import storage
 
 from schema import (
-    AntelMovil611,
+    AntelMovilGlobal,
+    AntelMovilNoGlobal,
     Reclamos,
     MotivosIZI611,
     Whatsapp,
@@ -60,12 +61,13 @@ def buscar_y_descargar_archivos(bucket_name, prefix, keywords):
 def armar_reporte() -> Reporte:
     storage_client = storage.Client()
     aiplatform.init(project="accesa-equipo2", location="us-central1")
-    genmodel = GenerativeModel("gemini-2.0-flash-001")  # O usa "gemini-1.5-pro"
+    # genmodel = GenerativeModel("gemini-2.0-flash")
+    genmodel = GenerativeModel("gemini-2.5-pro")
 
     # Define tu bucket y prefijo (carpeta dentro del bucket si aplica)
     bucket_name = "docs_equipo2"
     prefix = "csvs/"  # si querés filtrar una carpeta, ej: "datos/"
-    keywords = ["excepcion_20%", "sites_services_inf_recover_DateDay_output"]
+    keywords = ["excepcion_20%", "sites_services_inf_recover_DateDay_output", "DateDay"]
 
     archivos_texto = buscar_y_descargar_archivos(bucket_name, prefix, keywords)
 
@@ -121,11 +123,33 @@ def armar_reporte() -> Reporte:
     nombre_blob = archivos_texto["excepcion_20%"]["name"]
     blob = bucket.blob(nombre_blob)
 
-    csv_str = df2.to_csv(index=False)
-    blob.upload_from_string(csv_str, content_type="text/csv")
+    mask = df2["promeido.1"] >= 20
+    df2 = df2[mask]
+    new_df = pd.DataFrame()
+    new_df["Fecha"] = df2["mes"].dt.day
+
+    # new_df["ofrecidas"] = df2["ofrecidas"]
+
+    df = pd.read_csv(StringIO(archivos_texto["DateDay"]["content"]), header=1)
+    
+    mask = ~df["Fecha"].isin(new_df["Fecha"])
+
+    new_df = df[mask]
+
+    new_df = new_df.drop(columns=["Habilidad", "Fecha", "At.+Ab."]).sum(axis=0)
+    # print(new_df.head())
+    data = f"Ofrecidas,Abandonadas,Atendidas\n{new_df['Ofrecidas'].sum()},{new_df['Abandonadas'].sum()},{new_df['Atendidas'].sum()}"
+
+
+    # print(new_df)
+    # csv_str = new_df.to_csv(index=False)
+    # blob.upload_from_string(csv_str, content_type="text/csv")
 
     # Listar todos los archivos JSON en el bucket con el prefijo
     bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(f"{prefix}excepcion_20.csv")
+    response = blob.upload_from_string(str(data), content_type="text")
+
     blobs = storage_client.list_blobs(bucket, prefix=prefix)
 
     names = []
@@ -152,16 +176,24 @@ def armar_reporte() -> Reporte:
 
     texts = [get_text_from_gcs(uri) for uri in json_uris]
 
+    print(AntelMovilNoGlobal.model_json_schema())
     model_map = [
         (
-            AntelMovil611,
+            AntelMovilNoGlobal,
+            [
+                "excepcion",
+                "historic_reports_SKILL_output",
+            ],
+            "antel_movil_no_global",
+        ),
+        (
+            AntelMovilGlobal,
             [
                 "historic_reports_congestion_output",
                 "historic_reports_SKILL_output",
                 "sites_services_inf_recover_DateDay_output",
-                "Excepción_20%",
             ],
-            "antel_movil",
+            "antel_movil_global",
         ),
         (
             Reclamos,
@@ -195,14 +227,16 @@ def armar_reporte() -> Reporte:
         # encontrar los archivos
         full_text = ""
         ns = []
+        print(part_names)
         for part_name in part_names:
-            for name, text in zip(names, texts):
+            for name, text in zip(names, texts): 
                 # si coinciden los nombres
                 if part_name in name:
                     ns.append(name)
                     full_text += f"\nACA EMPIEZA EL ARCHIVO {name}\n"
                     full_text += text
                     full_text += f"\nACA TERMINA EL ARCHIVO {name}\n"
+        # print(full_text)
 
         print(f"Armando {model} con {ns}")
         generation_config = {
