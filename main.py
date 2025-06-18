@@ -204,7 +204,7 @@ def vaciar_bucket():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/generar-reporte', methods=['POST'])
-def generar_reporte():
+async def generar_reporte():
     try:
         #report_data  = armar_reporte()
 #
@@ -228,7 +228,7 @@ def generar_reporte():
         #
         #blob.upload_from_string(pdf_bytes, content_type="application/pdf")
 
-        report_data = armar_reporte()
+        report_data = await armar_reporte()
         pdf_bytes = generar_pdf(report_data)
 
         return send_file(

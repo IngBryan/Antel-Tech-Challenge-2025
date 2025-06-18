@@ -1,4 +1,5 @@
 from google.cloud import aiplatform
+import asyncio
 from vertexai.preview.generative_models import GenerativeModel
 import os
 from dotenv import load_dotenv,dotenv_values
@@ -58,11 +59,11 @@ def buscar_y_descargar_archivos(bucket_name, prefix, keywords):
     return encontrados
 
 
-def armar_reporte() -> Reporte:
+async def armar_reporte() -> Reporte:
     storage_client = storage.Client()
     aiplatform.init(project="accesa-equipo2", location="us-central1")
-    # genmodel = GenerativeModel("gemini-2.0-flash")
-    genmodel = GenerativeModel("gemini-2.5-pro")
+    genmodel = GenerativeModel("gemini-2.0-flash")
+    # genmodel = GenerativeModel("gemini-2.5-pro")
 
     # Define tu bucket y prefijo (carpeta dentro del bucket si aplica)
     bucket_name = "docs_equipo2"
@@ -122,33 +123,20 @@ def armar_reporte() -> Reporte:
 
     nombre_blob = archivos_texto["excepcion_20%"]["name"]
     blob = bucket.blob(nombre_blob)
-
     mask = df2["promeido.1"] >= 20
     df2 = df2[mask]
     new_df = pd.DataFrame()
     new_df["Fecha"] = df2["mes"].dt.day
-
-    # new_df["ofrecidas"] = df2["ofrecidas"]
-
     df = pd.read_csv(StringIO(archivos_texto["DateDay"]["content"]), header=1)
-    
     mask = ~df["Fecha"].isin(new_df["Fecha"])
-
     new_df = df[mask]
-
     new_df = new_df.drop(columns=["Habilidad", "Fecha", "At.+Ab."]).sum(axis=0)
-    # print(new_df.head())
     data = f"Ofrecidas,Abandonadas,Atendidas\n{new_df['Ofrecidas'].sum()},{new_df['Abandonadas'].sum()},{new_df['Atendidas'].sum()}"
 
 
-    # print(new_df)
-    # csv_str = new_df.to_csv(index=False)
-    # blob.upload_from_string(csv_str, content_type="text/csv")
-
-    # Listar todos los archivos JSON en el bucket con el prefijo
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(f"{prefix}excepcion_20.csv")
-    response = blob.upload_from_string(str(data), content_type="text")
+    blob.upload_from_string(str(data), content_type="text")
 
     blobs = storage_client.list_blobs(bucket, prefix=prefix)
 
@@ -163,6 +151,7 @@ def armar_reporte() -> Reporte:
 
     def get_text_from_gcs(uri: str) -> str:
         # Convierte gs://bucket/path.txt → bucket, path.txt
+        print(f"Descargando {uri}")
         if not uri.startswith("gs://"):
             raise ValueError("URI debe comenzar con gs://")
 
@@ -174,9 +163,9 @@ def armar_reporte() -> Reporte:
         blob = bucket.blob(blob_name)
         return blob.download_as_text()
 
-    texts = [get_text_from_gcs(uri) for uri in json_uris]
+    tasks = [asyncio.to_thread(get_text_from_gcs, uri) for uri in json_uris]
+    texts = await asyncio.gather(*tasks)
 
-    print(AntelMovilNoGlobal.model_json_schema())
     model_map = [
         (
             AntelMovilNoGlobal,
@@ -223,11 +212,12 @@ def armar_reporte() -> Reporte:
     ]
 
     json_data = {}
+    prompts = []
     for model, part_names, attr_name in model_map:
         # encontrar los archivos
         full_text = ""
         ns = []
-        print(part_names)
+        # print(part_names)
         for part_name in part_names:
             for name, text in zip(names, texts): 
                 # si coinciden los nombres
@@ -238,28 +228,43 @@ def armar_reporte() -> Reporte:
                     full_text += f"\nACA TERMINA EL ARCHIVO {name}\n"
         # print(full_text)
 
-        print(f"Armando {model} con {ns}")
+        # print(f"Armando {model} con {ns}")
         generation_config = {
             "response_mime_type": "application/json",
             "response_json_schema": model.model_json_schema(),
         }
 
-        response = genmodel.generate_content(
+        prompts.append((
             "Llena a partir de los siguientes datos:\n\n" + full_text,
-            generation_config=generation_config,
-        )
+            generation_config
+        ))
+        # response = genmodel.generate_content(
+        #     generation_config=,
+        # )
 
-        import json
+        # import json
+        #
+        # json_data[attr_name] = json.loads(response.text)
+        # print(response.text)
 
-        json_data[attr_name] = json.loads(response.text)
-        print(response.text)
+
+    def f(args):
+        prompt, cfg = args
+        print("Generando...")
+        return genmodel.generate_content(prompt, generation_config=cfg)
+
+    tasks = [asyncio.to_thread(f, args) for args in prompts]
+    fields = [field for (_, _, field) in model_map]
+    results = await asyncio.gather(*tasks)
+    
+    import json
+    json_data = {field: json.loads(result.text) for result, field in zip(results, fields)}
 
     return Reporte(**json_data)
 
-
 if __name__ == "__main__":
-    reporte = armar_reporte()
-    #print(reporte)
+    reporte = asyncio.run(armar_reporte())
+    print(reporte)
 
 # Convertimos cada URI en un Part con el mime_type correcto para JSON
 # parts = [Part.from_uri(uri, mime_type="text/csv") for uri in json_uris]
