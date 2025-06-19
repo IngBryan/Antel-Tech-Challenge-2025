@@ -32,14 +32,17 @@ def generar_pdf(reporte: Reporte) -> bytes:
 
     # Antel Móvil
     write_line("ANTEL MÓVIL - 611", bold=True)
-    #am = reporte.antel_movil
-    #write_line(f"Llamadas al servicio: {am.llamadas_al_servicio}")
-    #write_line(f"Llamadas atendidas: {am.llamadas_atendidas_totales}")
-    #write_line(f"Llamadas abandonadas: {am.llamadas_abandonadas}")
-    #write_line(f"Índice de respuesta: {am.indice_respuesta:.2f}%")
-    #write_line(f"TRSAC: {am.trsac} segundos")
-    #write_line(f"Cumplimiento del servicio: {am.cumplimiento_servicio:.2f}%")
-    #write_line(f"Congestión: {am.congestion}")
+    am = reporte.antel_movil_global
+    amNG = reporte.antel_movil_no_global
+    write_line(f"Llamadas al servicio: {am.llamadas_al_servicio_global}")
+    write_line(f"Llamadas atendidas: {am.llamadas_atendidas_totales_global}")
+    write_line(f"Llamadas abandonadas: {am.llamadas_abandonadas_global}")
+    write_line(f"Índice de respuesta: {amNG.indice_de_respuesta:.2f}%")
+    write_line(f"TRSAC: {am.trsac} segundos")
+    write_line(f"Cumplimiento del servicio: {amNG.cumplimiento_servicio:.2f}%")
+    write_line(f"Promedio operación (segundos): {am.promedio_operacion}")
+    write_line(f"Tiempo total atención (horas) : {am.atencion}")
+    write_line(f"Congestión: {am.congestion}")
 
     write_line("-" * 80)
 

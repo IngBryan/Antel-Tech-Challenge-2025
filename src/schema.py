@@ -97,10 +97,6 @@ class AntelMovilNoGlobal(BaseModel):
     def indice_de_respuesta(self):
         return self.llamadas_atendidas_totales / self.llamadas_al_servicio
 
-    @property
-    def trsac(self):
-        return self.total_demora / self.llamadas_atendidas_totales
-
 
 class Whatsapp(BaseModel):
     entrantes: int = Field(
