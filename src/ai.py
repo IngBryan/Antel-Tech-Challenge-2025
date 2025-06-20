@@ -11,8 +11,9 @@ from io import BytesIO
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "../Config.env"))
 config = dotenv_values()
 ruta_json = os.getenv("CLAVE")
+bucket_name=os.getenv("NOMBRE_BUCKET")
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ruta_json
-
+prefix=os.getenv("RUTA_ARCHIVO")
 from vertexai import init
 from vertexai.generative_models import GenerativeModel, Part
 from google.cloud import storage
@@ -30,113 +31,76 @@ from src.schema import (
     Reporte,
 )
 
-
-def normalizar(texto):
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', texto.lower())
-        if unicodedata.category(c) != 'Mn'
-    )
-
-def buscar_y_descargar_archivos(bucket_name, prefix, keywords):
+def procesar_excepcion_menor_20(bucket_name, prefix=""):
     storage_client = storage.Client()
-    blobs = storage_client.list_blobs(bucket_name, prefix=prefix)
+    bucket = storage_client.bucket(bucket_name)
 
-    encontrados = {}
-    for keyword in keywords:
-        encontrados[keyword] = None
+    # Buscar el blob que contiene "excepcion_20%" (insensible a mayúsculas)
+    blobs = list(storage_client.list_blobs(bucket, prefix=prefix))
+    blob_excepcion = next((b for b in blobs if "excepción_20%" in b.name.lower()), None)
 
-    for blob in blobs:
-        for keyword in keywords:
-            if encontrados[keyword] is None and normalizar(keyword) in normalizar(blob.name):
-                print(f"Archivo encontrado para '{keyword}': {blob.name}")
-                encontrados[keyword] = {
-                    "name": blob.name,
-                    "content": blob.download_as_text()
-                }
-        if all(v is not None for v in encontrados.values()):
-            break
+    if not blob_excepcion:
+        print("No se encontró un archivo con 'excepción_20%' en el nombre.")
+        return
 
-    return encontrados
+    print(f"Procesando archivo: {blob_excepcion.name}")
 
+    # Descargar el contenido del CSV
+    csv_content = blob_excepcion.download_as_text()
+    df = pd.read_csv(StringIO(csv_content))
+
+    # Asegurarse de que la columna Mes es datetime
+    df["Mes"] = pd.to_datetime(df["Mes"], errors="coerce")
+
+    # Obtener el último mes (año + mes)
+    ultimo_mes = df["Mes"].dt.to_period("M").max()
+
+    # Filtrar por ese mes
+    df_mes = df[df["Mes"].dt.to_period("M") == ultimo_mes]
+
+    # Filtrar por Promeido < 0.20
+    df_filtrado = df_mes[df_mes["Promeido"] < 0.20]
+    df_resumen = resumir_llamadas(df_filtrado)
+    # Convertir de nuevo a CSV
+    output = StringIO()
+    df_resumen.to_csv(output, index=False)
+    output.seek(0)
+
+    # Nombre del nuevo archivo
+    nuevo_nombre = blob_excepcion.name.replace("excepción_20%", "Excepción_menor_20")
+
+    # Subir el archivo filtrado al bucket
+    blob_nuevo = bucket.blob(nuevo_nombre)
+    blob_nuevo.upload_from_string(output.getvalue(), content_type="text/csv")
+
+    print(f"Archivo filtrado subido como: {nuevo_nombre}")
+def resumir_llamadas(df):
+    columnas_a_sumar = [
+        "Ofrecidas",
+        "Atendidas",
+        "Atendidas dentro del umbral",
+        "Abandonadas"
+    ]
+
+    # Asegurarse de que las columnas existan y sean numéricas
+    for col in columnas_a_sumar:
+        if col not in df.columns:
+            raise ValueError(f"Columna faltante: {col}")
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    suma = df[columnas_a_sumar].sum().to_frame().T  # .T para que quede como una fila
+
+    return suma
 
 async def armar_reporte() -> Reporte:
     storage_client = storage.Client()
     aiplatform.init(project="accesa-equipo2", location="us-central1")
     genmodel = GenerativeModel("gemini-2.0-flash")
-    # genmodel = GenerativeModel("gemini-2.5-pro")
-
-    # Define tu bucket y prefijo (carpeta dentro del bucket si aplica)
-    bucket_name = "docs_equipo2"
-    prefix = "csvs/"  # si querés filtrar una carpeta, ej: "datos/"
-    keywords = ["excepcion_20%", "sites_services_inf_recover_DateDay_output", "DateDay"]
-
-    archivos_texto = buscar_y_descargar_archivos(bucket_name, prefix, keywords)
-
-    df1 = pd.read_csv(StringIO(archivos_texto["sites_services_inf_recover_DateDay_output"]["content"]), header=1)
-    df2 = pd.read_csv(StringIO(archivos_texto["excepcion_20%"]["content"]))
-
-    # Normalizar nombres
-    df1.columns = [normalizar(c).strip().lower() for c in df1.columns]
-    df2.columns = [normalizar(c).strip().lower() for c in df2.columns]
-
-    # Agrupar df1 por fecha
-    df1_grouped = df1.groupby('fecha')['ofrecidas'].sum()
-
-    # Convertir columna mes a datetime
-    df2['mes'] = pd.to_datetime(df2['mes'], errors='coerce')
-
-    # Ordenar por fecha
-    df2 = df2.sort_values("mes").reset_index(drop=True)
-    # Calcular ofrecidas y promedio si ofrecidas está vacía
-    for idx, row in df2.iterrows():
-        if pd.isna(row['ofrecidas']):
-            fecha = row['mes']
-            if not pd.isna(fecha):
-                dia = fecha.day
-                if dia in df1_grouped.index:
-                    df2.at[idx, 'ofrecidas'] = df1_grouped[dia]
-                else:
-                    df2.at[idx, 'ofrecidas'] = 0
-            else:
-                df2.at[idx, 'ofrecidas'] = 0
-
-            # Calcular promedio solo si ofrecidas se calculó recién
-            ofrecidas_actual = float(df2.at[idx, 'ofrecidas'])
-            fechas_pasadas = [fecha - timedelta(days=d) for d in [7, 14, 21, 28]]
-            ofrecidas_pasadas = []
-
-            for f in fechas_pasadas:
-                match = df2[df2['mes'] == f]
-                if not match.empty and not pd.isna(match.iloc[0]['ofrecidas']):
-                    ofrecidas_pasadas.append(float(match.iloc[0]['ofrecidas']))
-
-            if ofrecidas_pasadas:
-                promedio_pasado = sum(ofrecidas_pasadas) / len(ofrecidas_pasadas)
-                variacion = (ofrecidas_actual / promedio_pasado - 1) if promedio_pasado != 0 else None
-            else:
-                variacion = None
-
-            df2.at[idx, 'Promeido'] = round(variacion*100)
-
-    storage_client = storage.Client(project="accesa-equipo2")
-    bucket = storage_client.bucket(bucket_name)
-
-    nombre_blob = archivos_texto["excepcion_20%"]["name"]
-    blob = bucket.blob(nombre_blob)
-    mask = df2["promeido.1"] >= 20
-    df2 = df2[mask]
-    new_df = pd.DataFrame()
-    new_df["Fecha"] = df2["mes"].dt.day
-    df = pd.read_csv(StringIO(archivos_texto["DateDay"]["content"]), header=1)
-    mask = ~df["Fecha"].isin(new_df["Fecha"])
-    new_df = df[mask]
-    new_df = new_df.drop(columns=["Habilidad", "Fecha", "At.+Ab."]).sum(axis=0)
-    data = f"Ofrecidas,Abandonadas,Atendidas\n{new_df['Ofrecidas'].sum()},{new_df['Abandonadas'].sum()},{new_df['Atendidas'].sum()}"
-
+    #genmodel = GenerativeModel("gemini-2.5-pro")
 
     bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(f"{prefix}excepcion_20.csv")
-    blob.upload_from_string(str(data), content_type="text")
+
+    procesar_excepcion_menor_20(bucket_name, prefix)
 
     blobs = storage_client.list_blobs(bucket, prefix=prefix)
 
@@ -170,8 +134,7 @@ async def armar_reporte() -> Reporte:
         (
             AntelMovilNoGlobal,
             [
-                "excepcion",
-                "historic_reports_SKILL_output",
+                "Excepción_20%",
             ],
             "antel_movil_no_global",
         ),
@@ -238,15 +201,6 @@ async def armar_reporte() -> Reporte:
             "Llena a partir de los siguientes datos:\n\n" + full_text,
             generation_config
         ))
-        # response = genmodel.generate_content(
-        #     generation_config=,
-        # )
-
-        # import json
-        #
-        # json_data[attr_name] = json.loads(response.text)
-        # print(response.text)
-
 
     def f(args):
         prompt, cfg = args
@@ -266,27 +220,3 @@ if __name__ == "__main__":
     reporte = asyncio.run(armar_reporte())
     print(reporte)
 
-# Convertimos cada URI en un Part con el mime_type correcto para JSON
-# parts = [Part.from_uri(uri, mime_type="text/csv") for uri in json_uris]
-
-# parts = ""
-# for text, name in zip(texts, names):
-#     parts += f"\n\n A CONTINUACIÓN EMPIEZA EL ARCHIVO {name}"
-#     parts += text
-#     parts += f"\n\n AQUI TERMINA EL ARCHIVO {name}"
-
-
-# from schema import Reporte
-
-# generation_config = {
-#     "response_mime_type": "application/json",
-#     "response_json_schema": Reporte.model_json_schema(),
-# }
-
-# response = genmodel.generate_content(
-#     # ["Llena a partir de los siguientes datos:"] + parts,
-#     "Llena a partir de los siguientes datos:\n\n" + parts,
-#     generation_config=generation_config,
-# )
-
-# print(response.text)

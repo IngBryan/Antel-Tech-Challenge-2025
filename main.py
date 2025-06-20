@@ -106,7 +106,7 @@ def api_upload():
     files_processed = []
 
     for i, (field_name, file) in enumerate(request.files.items()):
-        filename = file.filename.lower()
+        filename = file.filename
 
         # Procesar Excel
         if filename.endswith(('.xls', '.xlsx')):
@@ -129,7 +129,7 @@ def api_upload():
                             else:
                                 new_filename = f"{base_name}_Excepción_20%.csv"
                             blob = bucket.blob(f"{os.getenv('RUTA_ARCHIVO')}{new_filename}")
-                            blob.upload_from_string(csv_data, content_type='text/csv')
+                            blob.upload_from_string(csv_data, content_type='application/vnd.ms-excel')
                             print(f"Archivo subido: {new_filename}")
                         except Exception as e:
                             print(f"Error procesando hoja {nro_hoja} de {filename}: {e}")
@@ -144,7 +144,7 @@ def api_upload():
 
                     new_filename = filename.rsplit('.', 1)[0] + ".csv"
                     blob = bucket.blob(f"{os.getenv('RUTA_ARCHIVO')}{new_filename}")
-                    blob.upload_from_string(csv_data, content_type='text/csv')
+                    blob.upload_from_string(csv_data, content_type='application/vnd.ms-excel')
                     print(f"Archivo subido: {new_filename}")
                     filename = new_filename
 
@@ -155,7 +155,7 @@ def api_upload():
         elif filename.endswith('.csv'):
             try:
                 blob = bucket.blob(f"{os.getenv("RUTA_ARCHIVO")}{filename}")
-                blob.upload_from_file(file, content_type='text/csv')
+                blob.upload_from_file(file, content_type='application/vnd.ms-excel')
                 print(f"Archivo subido: {filename}")
             except Exception as e:
                 print(f"Error subiendo archivo CSV {filename}: {e}")

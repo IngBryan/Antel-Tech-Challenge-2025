@@ -76,18 +76,26 @@ class AntelMovilGlobal(BaseModel):
 
 class AntelMovilNoGlobal(BaseModel):
     # CON EXCEPCION
-    llamadas_al_servicio: int = Field(description="valor de la columna “Ofrecidas”")
+    llamadas_al_servicio: int = Field(
+        description="Valor de la columna 'Ofrecidas'."
+    )
     llamadas_atendidas_totales: int = Field(
-        description="valor de la columna “Atendidas”"
+        description="Valor de la columna 'Atendidas'."
     )
-    llamadas_abandonadas: int = Field(description="valor de la columna “Abandonadas”")
-    total_demora: int = Field(
-        description='Se obtiene a partir de “Habilidad” en la fila “ANTEL MOVIL” columna "Demora en Atender"'
+    llamadas_abandonadas: int = Field(
+        description="Valor de la columna 'Abandonadas'."
     )
-    cumplimiento_servicio: float = Field(
-        title="Cumplimiento de Servicio",
-        description=f'El {nivel_servicio[0]}% de nivel de servicio equivale al 100% de cumplimiento. Operación: Nivel de servicio / {nivel_servicio[0]}%."',
+    llamadas_dentro_del_umbral:int=Field(
+        description="Valor de la columna 'Atendidas dentro del umbral'."
     )
+
+    @property
+    def nivel_de_servicio(self):
+        return (self.llamadas_dentro_del_umbral / self.llamadas_atendidas_totales)*100
+
+    @property
+    def cumplimient_nivel_de_servicio(self):
+        return self.nivel_de_servicio/(nivel_servicio[0]/100)
 
     @property
     def porcentaje_no_atendidas(self):
@@ -95,8 +103,7 @@ class AntelMovilNoGlobal(BaseModel):
 
     @property
     def indice_de_respuesta(self):
-        return self.llamadas_atendidas_totales / self.llamadas_al_servicio
-
+        return (self.llamadas_atendidas_totales / self.llamadas_al_servicio)*100
 
 class Whatsapp(BaseModel):
     entrantes: int = Field(
