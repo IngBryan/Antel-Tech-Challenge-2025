@@ -154,7 +154,7 @@ def api_upload():
 
         elif filename.endswith('.csv'):
             try:
-                blob = bucket.blob(f"{os.getenv("RUTA_ARCHIVO")}{filename}")
+                blob = bucket.blob(f"{os.getenv('RUTA_ARCHIVO')}{filename}")
                 blob.upload_from_file(file, content_type='application/vnd.ms-excel')
                 print(f"Archivo subido: {filename}")
             except Exception as e:
@@ -241,4 +241,4 @@ async def generar_reporte():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
