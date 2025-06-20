@@ -206,30 +206,26 @@ def vaciar_bucket():
 @app.route('/api/generar-reporte', methods=['POST'])
 async def generar_reporte():
     try:
-        #report_data  = armar_reporte()
-#
-        #pdf_bytes = generar_pdf(report_data)
-#
-        #storage_client = storage.Client.from_service_account_json(str(ruta_clave))
-        #bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
-#
-        #blobs = bucket.list_blobs(prefix=os.getenv("RUTA_ARCHIVO"))
-#
-        #for blob in blobs:
-        #    # Ignorar si es una "carpeta vacía" (GCS trata carpetas como blobs con / al final)
-        #    if blob.name.endswith("/"):
-        #        continue
-#
-        #    nuevo_nombre = blob.name.replace(os.getenv("RUTA_ARCHIVO"), os.getenv("RUTA_PROCESADOS"), 1)
-        #    nuevo_blob = bucket.copy_blob(blob, bucket, new_name=nuevo_nombre)
-        #    blob.delete()
-#
-        #blob = bucket.blob("reportes/reporte_generado.pdf")
-        #
-        #blob.upload_from_string(pdf_bytes, content_type="application/pdf")
-
         report_data = await armar_reporte()
         pdf_bytes = generar_pdf(report_data)
+
+        storage_client = storage.Client.from_service_account_json(str(ruta_clave))
+        bucket = storage_client.bucket(os.getenv("NOMBRE_BUCKET"))
+
+        blobs = bucket.list_blobs(prefix=os.getenv("RUTA_ARCHIVO"))
+
+        for blob in blobs:
+            # Ignorar si es una "carpeta vacía" (GCS trata carpetas como blobs con / al final)
+            if blob.name.endswith("/"):
+                continue
+
+            nuevo_nombre = blob.name.replace(os.getenv("RUTA_ARCHIVO"), os.getenv("RUTA_PROCESADOS"), 1)
+            nuevo_blob = bucket.copy_blob(blob, bucket, new_name=nuevo_nombre)
+            blob.delete()
+
+        blob = bucket.blob("reportes/reporte_generado.pdf")
+        
+        blob.upload_from_string(pdf_bytes, content_type="application/pdf")
 
         return send_file(
             io.BytesIO(pdf_bytes),
