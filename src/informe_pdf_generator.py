@@ -523,8 +523,8 @@ class InformePDFGenerator:
         print(f"Reporte generado en memoria ({len(pdf_bytes)} bytes)")
 
         # Guardar manualmente donde quieras
-        with open(self.filename, "wb") as f:
-            f.write(pdf_bytes)
+        # with open(self.filename, "wb") as f:
+        #     f.write(pdf_bytes)
 
         return pdf_bytes
 
