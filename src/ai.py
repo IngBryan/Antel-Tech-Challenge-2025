@@ -1,5 +1,6 @@
 from google.cloud import aiplatform
 import asyncio
+from reporte_pdf import generar_pdf
 from vertexai.preview.generative_models import GenerativeModel
 import os
 from dotenv import load_dotenv,dotenv_values

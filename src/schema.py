@@ -73,6 +73,10 @@ class AntelMovilGlobal(BaseModel):
         description="Cantidad de llamadas que la central devolvio tono ocupado. La operacion es: (Llamadas_con_tono_ocupado / Cantidad_de_intento). Se puede obtener a partir de “Reporte de Calificaciones” en la columna “611(%)” sumando la congesti0n de cada dia, dividiendola por la cantidad de dias."
     )
 
+    @property
+    def indice_de_respuesta_global(self):
+        return (self.llamadas_atendidas_totales_global / self.llamadas_al_servicio_global)*100
+
 
 class AntelMovilNoGlobal(BaseModel):
     # CON EXCEPCION
