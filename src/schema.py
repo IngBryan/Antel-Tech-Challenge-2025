@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv, dotenv_values
 from pydantic import BaseModel, Field
+from typing import Optional
 
 
 load_dotenv(dotenv_path="../Config.env")
@@ -13,7 +14,8 @@ nivel_servicio = tuple(map(int, nivel_str.split("/")))  # (80,20)
 class Incidencia(BaseModel):
     fecha: str = Field(description="Fecha de incidencia en formato XX-XX-XX.")
     motivo: str = Field(description="Resumen del motivo de la incidencia.")
-
+    responsabilidad: str = Field(description="Responsable de la incidencia.")
+    descripcion: str = Field(description="Descripción de la incidencia.")
 
 class Reclamos(BaseModel):
     # campania: str = Field(description="Por ejemplo Reclamos_611")
@@ -52,7 +54,7 @@ class AntelMovilGlobal(BaseModel):
 
     @property
     def porcentaje_no_atendidas_global(self):
-        return self.llamadas_abandonadas_global / self.llamadas_al_servicio_global
+        return (self.llamadas_abandonadas_global / self.llamadas_al_servicio_global) * 100
 
     cumplimiento_de_servicio_global: float = Field(
         title="Cumplimiento de Servicio Global",
@@ -76,6 +78,10 @@ class AntelMovilGlobal(BaseModel):
     @property
     def indice_de_respuesta_global(self):
         return (self.llamadas_atendidas_totales_global / self.llamadas_al_servicio_global)*100
+    
+    @property
+    def porcentaje_cumplimiento_de_servicio_global(self):
+        return self.cumplimiento_de_servicio_global*100
 
 
 class AntelMovilNoGlobal(BaseModel):
@@ -103,7 +109,7 @@ class AntelMovilNoGlobal(BaseModel):
 
     @property
     def porcentaje_no_atendidas(self):
-        return self.llamadas_abandonadas / self.llamadas_al_servicio
+        return (self.llamadas_abandonadas / self.llamadas_al_servicio) * 100
 
     @property
     def indice_de_respuesta(self):
@@ -130,16 +136,16 @@ class Whatsapp(BaseModel):
 
 class Salientes(BaseModel):
     movil_contratos: int = Field(
-        description="Total de llamadas salientes respecto a MOVIL_Contratos. Se obtiene de la columna “Saliente”."
+        description="Total de llamadas salientes respecto al valor MOVIL_Contratos en la columna “Nombre de cola”. Se obtiene de la columna “Saliente”."
     )
     movil_prepagos: int = Field(
-        description="Total de llamadas salientes respecto a MOVIL_Prepagos. Se obtiene de la columna “Saliente”."
+        description="Total de llamadas salientes respecto al valor MOVIL_Prepagos en la columna “Nombre de cola”. Se obtiene de la columna “Saliente”."
     )
-    movil_prioritarios: int = Field(
-        description="Total de llamadas salientes respecto a MOVIL_Prioritarios. Se obtiene de la columna “Saliente”."
-    )
+    #movil_prioritarios: int = Field(
+    #    description="Total de llamadas salientes respecto a MOVIL_Prioritarios. Se obtiene de la columna “Saliente”."
+    #)
     salientes_movil: int = Field(
-        description="Total de llamadas salientes respecto a Salientes_movil. Se obtiene de la columna “Saliente”."
+        description="Total de llamadas salientes respecto al valor Salientes_Movil en la columna “Nombre de cola”. Se obtiene de la columna “Saliente”."
     )
 
     @property
@@ -147,7 +153,7 @@ class Salientes(BaseModel):
         return (
             self.movil_contratos
             + self.movil_prepagos
-            + self.movil_prioritarios
+            #+ self.movil_prioritarios
             + self.salientes_movil
         )
 
@@ -222,6 +228,9 @@ class Reporte(BaseModel):
     whatsapp: Whatsapp
     salientes: Salientes
     automatismos: Automatismos
+    lista_dias: Optional[list[int]]
+    mes: Optional[int]
+    anio: Optional[int]
 
 
 if __name__ == "__main__":

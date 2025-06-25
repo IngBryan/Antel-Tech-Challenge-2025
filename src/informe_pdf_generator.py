@@ -16,7 +16,8 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from src.schema import Reporte, AntelMovilNoGlobal, AntelMovilGlobal, Incidencias, Incidencia, Reclamos, MotivosIZI611, MotivoIZI611
 from src.schema import MotivosContacto, MotivoContacto, Whatsapp, Salientes, Automatismos
-from datetime import datetime
+from datetime import datetime, timedelta
+from collections import defaultdict
 
 from io import BytesIO
 import calendar
@@ -94,7 +95,7 @@ class InformePDFGenerator:
         self.story.append(Paragraph(descripcion, self.styles['TextoNormal']))
         self.story.append(Spacer(1, 18))
 
-    def crear_tabla_indicadores_principales(self, antel_movil: AntelMovilNoGlobal, antel_movil_global: AntelMovilGlobal):
+    def crear_tabla_indicadores_principales(self, antel_movil_no_global: AntelMovilNoGlobal, antel_movil_global: AntelMovilGlobal, mes:int, anio:int):
         """Crear tabla con indicadores principales"""
         self.story.append(Paragraph("Indicadores de Gestión de las Llamadas", self.styles['Subtitulo']))
         self.story.append(Paragraph("El cuadro a continuación refleja los principales indicadores del mes:", 
@@ -103,13 +104,13 @@ class InformePDFGenerator:
         
         # Datos de la tabla corregir
         data = [
-            [f"ANTEL - MÓVIL 611", f"{self.mes_nombre}-{self.ano}"],
-            ["Llamadas al servicio", f"{antel_movil.llamadas_al_servicio:,}"],
-            ["Llamadas atendidas totales", f"{antel_movil.llamadas_atendidas_totales:,}"],
-            ["Llamadas abandonadas", f"{antel_movil.llamadas_abandonadas:,}"],
-            ["% Llamadas no atendidas", f"{antel_movil.porcentaje_no_atendidas:.1f}%"],
-            ["Cumplimiento Nivel de servicio 80/20", f"{antel_movil.cumplimient_nivel_de_servicio:.1f}%"],
-            ["Índice de respuesta", f"{antel_movil.indice_de_respuesta:.1f}%"],
+            ["ANTEL - MÓVIL 611", f"{calendar.month_name[mes]}-{anio}"],
+            ["Llamadas al servicio", f"{antel_movil_global.llamadas_al_servicio_global:,}"],
+            ["Llamadas atendidas totales", f"{antel_movil_global.llamadas_atendidas_totales_global:,}"],
+            ["Llamadas abandonadas", f"{antel_movil_global.llamadas_abandonadas_global:.1f}"],
+            ["% Llamadas no atendidas", f"{antel_movil_no_global.porcentaje_no_atendidas:.1f}%"],
+            ["Cumplimiento Nivel de servicio 80/20", f"{antel_movil_no_global.cumplimient_nivel_de_servicio:.1f}%"],
+            ["Índice de respuesta", f"{antel_movil_no_global.indice_de_respuesta:.1f}%"],
             ["TRSAC", f"{antel_movil_global.trsac}"],
             ["Promedio operación (segundos)", f"{antel_movil_global.promedio_operacion:.2f}"],
             ["Tiempo total atención (horas)", f"{antel_movil_global.atencion:,.2f}"],
@@ -134,7 +135,7 @@ class InformePDFGenerator:
         
         # Promedio diario
         _, cantidad_dias = calendar.monthrange(self.ano, self.mes)
-        promedio_diario = antel_movil.llamadas_al_servicio // cantidad_dias  
+        promedio_diario = antel_movil_global.llamadas_al_servicio_global // cantidad_dias  
         self.story.append(Paragraph(f"El promedio de llamadas diarias ingresado al servicio en el mes fue de {promedio_diario:,}", 
                                   self.styles['TextoNormal']))
         self.story.append(Spacer(1, 12))
@@ -145,22 +146,47 @@ class InformePDFGenerator:
                                   self.styles['TextoNormal']))
         self.story.append(Spacer(1, 6))
         
+        incidencias_por_fecha = defaultdict(list)
         for inc in incidencias.incidencias:
-            texto = f"▪ {inc.fecha} {inc.motivo}"
-            self.story.append(Paragraph(texto, self.styles['TextoPequeno']))
-        
+            if inc.responsabilidad == "Cliente":
+                incidencias_por_fecha[inc.fecha].append(inc.descripcion)
+
+        motivo_style = ParagraphStyle('MotivoIndentado', parent=self.styles['TextoPequeno'], leftIndent=15)
+
+        for fecha, descripcion in sorted(incidencias_por_fecha.items()):
+            if len(descripcion) == 1:
+                texto = f"▪ {fecha} {descripcion[0]}"
+                self.story.append(Paragraph(texto, self.styles['TextoPequeno']))
+            else:
+                self.story.append(Paragraph(f"▪ {fecha}", self.styles['TextoPequeno']))
+                for motivo in descripcion:
+                    self.story.append(Paragraph(f"• {motivo}", motivo_style))
+                
         self.story.append(Spacer(1, 12))
 
-    def agregar_indicadores_globales(self, antel_movil: AntelMovilNoGlobal, antel_movil_global: AntelMovilGlobal):
+    def agregar_frase_importante(self, lista: list[int]):
+        if not lista:
+            return
+
+        dias_str = ", ".join(str(dia) for dia in sorted(lista))
+        descripcion = f"""
+        Para el cálculo de indicadores globales del mes se excluye el/los día/s {dias_str} ya que las llamadas 
+        del día superaron en más de un 20% al promedio de las 4 semanas anteriores, por 
+        tanto, se configura la condición de excepción establecida en el SLA vigente.
+        """
+        self.story.append(Paragraph(descripcion.strip(), self.styles['TextoNormal']))
+
+
+    def agregar_indicadores_globales(self, antel_movil_no_global: AntelMovilNoGlobal, antel_movil_global: AntelMovilGlobal):
         
         """Agregar explicación de indicadores globales"""
         self.story.append(Paragraph("Los indicadores globales son los siguientes:", self.styles['TextoNormal']))
         
         indicadores = [ 
-            f"● El % de llamadas no atendidas es {antel_movil.porcentaje_no_atendidas:.1f}%, el indicador global del mes fue {antel_movil_global.porcentaje_no_atendidas_global:.1f}%.",
-            f"● El Nivel de Servicio 80/20 es {antel_movil.cumplimient_nivel_de_servicio:.1f}%, el indicador global del mes fue {antel_movil_global.cumplimiento_de_servicio_global:.1f}%.",
+            f"● El % de llamadas no atendidas es {antel_movil_no_global.porcentaje_no_atendidas:.1f}%, el indicador global del mes fue {antel_movil_global.porcentaje_no_atendidas_global:.1f}%.",
+            f"● El Nivel de Servicio 80/20 es {antel_movil_no_global.cumplimient_nivel_de_servicio:.1f}%, el indicador global del mes fue {antel_movil_global.porcentaje_cumplimiento_de_servicio_global:.1f}%.",
             f"● El TRSAC es de {antel_movil_global.trsac} segundos, el indicador global del mes fue {antel_movil_global.trsac} segundos.",
-            f"● El índice de respuesta es de {antel_movil.indice_de_respuesta:.1f}%, el indicador global del mes fue de {antel_movil_global.indice_de_respuesta_global:.1f}%."
+            f"● El índice de respuesta es de {antel_movil_no_global.indice_de_respuesta:.1f}%, el indicador global del mes fue de {antel_movil_global.indice_de_respuesta_global:.1f}%."
         ]
         
         for indicador in indicadores:
@@ -168,7 +194,7 @@ class InformePDFGenerator:
         
         self.story.append(Spacer(1, 18))
 
-    def crear_seccion_reclamos(self, reclamos: Reclamos, motivos_izi: MotivosIZI611):
+    def crear_seccion_reclamos(self, reclamos: Reclamos, motivos_izi: MotivosIZI611, mes:int, anio:int):
         """Crear sección del sistema de reclamos"""
         self.story.append(Paragraph("Gestión Sistema Reclamos", self.styles['Subtitulo']))
         
@@ -185,9 +211,15 @@ class InformePDFGenerator:
         self.story.append(Spacer(1, 12))
         
         # Tabla resumen reclamos
+        total_segundos = int(reclamos.manejo_total) // 1000
+
+        horas = total_segundos // 3600
+        minutos = (total_segundos % 3600) // 60
+        segundos = total_segundos % 60
+
         data_reclamos = [
             ["Mes", "Campaña", "Total Llamadas", "Tiempo Total"],
-            [f"{self.ano}-{self.mes}", "Reclamos_611", f"{reclamos.manejo:,}", reclamos.manejo_total]
+            [f"{anio}-{mes}", "Reclamos_611", f"{reclamos.manejo:,}", f"{horas:02}:{minutos:02}:{segundos:02}"]
         ]
         
         table_reclamos = Table(data_reclamos, colWidths=[3*cm, 4*cm, 4*cm, 4*cm])
@@ -210,10 +242,27 @@ class InformePDFGenerator:
         # Crear tabla de motivos
         data_motivos = [["Motivos IZI 611", "Cantidad"]]
         total_motivos = 0
-        for motivo in motivos_izi.motivosIzi611:
-            data_motivos.append([motivo.nombre_de_codigo_de_conclusion, f"{motivo.manejo:,}"])
-            total_motivos += motivo.manejo
-        
+
+        # Filtrar y convertir manejo a int
+        motivos_filtrados = [
+            motivo for motivo in motivos_izi.motivosIzi611
+            if "ININ" not in motivo.nombre_de_codigo_de_conclusion
+        ]
+
+
+        # Ordenar por manejo numérico descendente
+        motivos_ordenados = sorted(
+            motivos_filtrados,
+            key=lambda m: int(m.manejo),
+            reverse=True
+        )
+
+        for motivo in motivos_ordenados:
+            cantidad = int(motivo.manejo)
+            data_motivos.append([motivo.nombre_de_codigo_de_conclusion, f"{cantidad:,}"])
+            total_motivos += cantidad
+
+                
         data_motivos.append(["Total", f"{total_motivos:,}"])
         
         table_motivos = Table(data_motivos, colWidths=[12*cm, 3*cm])
@@ -232,13 +281,13 @@ class InformePDFGenerator:
         self.story.append(table_motivos)
         self.story.append(Spacer(1, 18))
 
-    def crear_seccion_whatsapp(self, whatsapp: Whatsapp):
+    def crear_seccion_whatsapp(self, whatsapp: Whatsapp, mes:int, anio:int):
         """Crear sección de WhatsApp"""
         self.story.append(Paragraph("Asistencia por Roaming vía WhatsApp (092611611 opción 7)", 
                                   self.styles['Subtitulo']))
         
         data_wa = [
-            [f"{self.mes_nombre}-25", ""],
+            [f"{calendar.month_name[mes]}-{anio}", ""],
             ["Cantidad de mensajes entrantes", f"{whatsapp.entrantes:,}"],
             ["Cantidad de mensajes salientes", f"{whatsapp.salientes:,}"],
             ["Total de mensajes", f"{whatsapp.total:,}"],
@@ -259,7 +308,7 @@ class InformePDFGenerator:
         self.story.append(table_wa)
         self.story.append(Spacer(1, 18))
 
-    def crear_seccion_salientes(self, salientes: Salientes):
+    def crear_seccion_salientes(self, salientes: Salientes, mes:int, anio:int):
         """Crear sección de llamadas salientes"""
         self.story.append(Paragraph("Llamadas Salientes", self.styles['Subtitulo']))
         
@@ -270,11 +319,11 @@ class InformePDFGenerator:
         self.story.append(Spacer(1, 12))
         
         data_salientes = [
-            [f"{self.mes_nombre}-{self.ano}", ""],
+            [f"{calendar.month_name[mes]}-{anio}", ""],
             ["Campaña", "Total"],
             ["MOVIL_Contratos", f"{salientes.movil_contratos}"],
             ["MOVIL_Prepagos", f"{salientes.movil_prepagos}"],
-            ["MOVIL_Prioritarios", f"{salientes.movil_prioritarios}"],
+            #["MOVIL_Prioritarios", f"{salientes.movil_prioritarios}"],
             ["Salientes_Movil", f"{salientes.salientes_movil}"],
             ["Total Llamadas", f"{salientes.total}"]
         ]
@@ -302,7 +351,16 @@ class InformePDFGenerator:
         """Crear sección de motivos de contacto"""
         self.story.append(Paragraph("Motivos de los contactos", self.styles['Subtitulo']))
         
-        total_motivos = sum([m.manejo for m in motivos.motivos_contactos])
+        motivos_filtrados = [
+            m for m in motivos.motivos_contactos
+            if m.nombre_de_codigo_de_conclusion not in {
+                "ININ-WRAP-UP-DELETED",
+                "Default Wrap-up Code",
+                "ININ-WRAP-UP-TIMEOUT"
+            }
+        ]
+
+        total_motivos = sum([m.manejo for m in motivos_filtrados])
         porcentaje = (total_motivos / total_llamadas_atendidas) * 100
         
         descripcion = f"Durante el mes se registraron {total_motivos:,} motivos, lo que corresponde al {porcentaje:.2f}% de las llamadas atendidas."
@@ -311,14 +369,14 @@ class InformePDFGenerator:
         
         # Agrupar por campaña
         campanas = {}
-        for motivo in motivos.motivos_contactos:
+        for motivo in motivos_filtrados:
             if motivo.nombre_cola not in campanas:
                 campanas[motivo.nombre_cola] = []
             campanas[motivo.nombre_cola].append(motivo)
         
         # Crear tabla para cada campaña
         data_motivos = [["Campaña", "Descripción", "Cantidad"]]
-        
+
         for campana, motivos_campana in sorted(campanas.items()):
             # Ordenar motivos por cantidad descendente
             motivos_ordenados = sorted(motivos_campana, key=lambda x: x.manejo, reverse=True)
@@ -362,6 +420,7 @@ class InformePDFGenerator:
         self.story.append(table_motivos)
         self.story.append(Spacer(1, 18))
 
+
     def crear_seccion_automatismos(self, automatismos: Automatismos):
         """Crear sección de automatismos"""
         self.story.append(Paragraph("Automatismos", self.styles['Subtitulo']))
@@ -397,13 +456,6 @@ class InformePDFGenerator:
         nota = """Las horas incurridas en los automatismos no se computan como horas de operación mensual."""
         self.story.append(Paragraph(nota, self.styles['TextoPequeno']))
         self.story.append(Spacer(1, 18))
-
-    def agregar_cierre(self):
-        """Agregar párrafo de cierre"""
-        cierre = """Finalmente, nos encontramos a las órdenes para cualquier aclaración respecto de 
-        este informe, así como para trabajar en las mejoras a realizar en el servicio."""
-        self.story.append(Paragraph(cierre, self.styles['TextoNormal']))
-        self.story.append(Spacer(1, 24))
 
     def agregar_footer_personalizado(self):
         """Agregar información de pie de página personalizada"""
@@ -441,15 +493,15 @@ class InformePDFGenerator:
         
         # Agregar todas las secciones
         self.agregar_titulo_principal() 
-        self.crear_tabla_indicadores_principales(reporte.antel_movil_no_global, reporte.antel_movil_global)
+        self.crear_tabla_indicadores_principales(reporte.antel_movil_no_global, reporte.antel_movil_global, reporte.mes, reporte.anio)
         self.agregar_incidencias(reporte.incidencias)
+        self.agregar_frase_importante(reporte.lista_dias)
         self.agregar_indicadores_globales(reporte.antel_movil_no_global, reporte.antel_movil_global)
-        self.crear_seccion_reclamos(reporte.reclamos, reporte.motivosIzi611)
-        self.crear_seccion_whatsapp(reporte.whatsapp)
-        self.crear_seccion_salientes(reporte.salientes)
+        self.crear_seccion_reclamos(reporte.reclamos, reporte.motivosIzi611, reporte.mes, reporte.anio)
+        self.crear_seccion_whatsapp(reporte.whatsapp, reporte.mes, reporte.anio)
+        self.crear_seccion_salientes(reporte.salientes, reporte.mes, reporte.anio)
         self.crear_seccion_motivos_contacto(reporte.motivos_contacto, reporte.antel_movil_global.llamadas_atendidas_totales_global)
         self.crear_seccion_automatismos(reporte.automatismos)
-        self.agregar_cierre()
         self.agregar_footer_personalizado()
         
         # Crear un buffer en memoria para el PDF

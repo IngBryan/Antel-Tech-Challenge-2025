@@ -8,7 +8,7 @@ import locale
 from src.schema import Reporte
 
 def generar_pdf(reporte: Reporte) -> bytes:
-    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
+    #locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 
     mes = datetime.now().month
     ano = datetime.now().year

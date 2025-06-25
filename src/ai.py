@@ -39,9 +39,15 @@ def procesar_excepcion_menor_20(bucket_name, prefix=""):
     blobs = list(storage_client.list_blobs(bucket, prefix=prefix))
     blob_excepcion = next((b for b in blobs if "excepción_20%" in b.name.lower()), None)
 
+    for blob in blobs:
+        nombre = blob.name.lower()
+        if "informe móvil" in nombre and "excepción_20%" in nombre:
+            print("Ya existe un archivo que contiene 'informe móvil' y 'excepción_20%'. No se procesa.")
+            return None, 1, 1
+
     if not blob_excepcion:
         print("No se encontró un archivo con 'excepción_20%' en el nombre.")
-        return
+        return None, None, None
 
     print(f"Procesando archivo: {blob_excepcion.name}")
 
@@ -58,9 +64,13 @@ def procesar_excepcion_menor_20(bucket_name, prefix=""):
     # Filtrar por ese mes
     df_mes = df[df["Mes"].dt.to_period("M") == ultimo_mes]
 
+    # Obtener días con Promeido >= 0.20
+    lista_dias = df_mes[df_mes["Promeido"] >= 0.20]["Mes"].dt.day.tolist()
+
     # Filtrar por Promeido < 0.20
     df_filtrado = df_mes[df_mes["Promeido"] < 0.20]
     df_resumen = resumir_llamadas(df_filtrado)
+
     # Convertir de nuevo a CSV
     output = StringIO()
     df_resumen.to_csv(output, index=False)
@@ -74,6 +84,9 @@ def procesar_excepcion_menor_20(bucket_name, prefix=""):
     blob_nuevo.upload_from_string(output.getvalue(), content_type="text/csv")
 
     print(f"Archivo filtrado subido como: {nuevo_nombre}")
+
+    return lista_dias, ultimo_mes.month, ultimo_mes.year
+
 def resumir_llamadas(df):
     columnas_a_sumar = [
         "Ofrecidas",
@@ -100,7 +113,7 @@ async def armar_reporte() -> Reporte:
 
     bucket = storage_client.bucket(bucket_name)
 
-    procesar_excepcion_menor_20(bucket_name, prefix)
+    lista_dias, mes, anio = procesar_excepcion_menor_20(bucket_name, prefix)
 
     blobs = storage_client.list_blobs(bucket, prefix=prefix)
 
@@ -214,7 +227,14 @@ async def armar_reporte() -> Reporte:
     import json
     json_data = {field: json.loads(result.text) for result, field in zip(results, fields)}
 
-    return Reporte(**json_data)
+    reporte = Reporte(
+        **json_data,
+        lista_dias=lista_dias,
+        mes=mes,
+        anio=anio
+    )
+
+    return reporte
 
 if __name__ == "__main__":
     reporte = asyncio.run(armar_reporte())
