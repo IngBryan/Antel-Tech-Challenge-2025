@@ -14,8 +14,8 @@ from reportlab.graphics import renderPDF
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from schema import Reporte, AntelMovilNoGlobal, AntelMovilGlobal, Incidencias, Incidencia, Reclamos, MotivosIZI611, MotivoIZI611
-from schema import MotivosContacto, MotivoContacto, Whatsapp, Salientes, Automatismos
+from src.schema import Reporte, AntelMovilNoGlobal, AntelMovilGlobal, Incidencias, Incidencia, Reclamos, MotivosIZI611, MotivoIZI611
+from src.schema import MotivosContacto, MotivoContacto, Whatsapp, Salientes, Automatismos
 from datetime import datetime
 
 from io import BytesIO
@@ -154,20 +154,6 @@ class InformePDFGenerator:
     def agregar_indicadores_globales(self, antel_movil: AntelMovilNoGlobal, antel_movil_global: AntelMovilGlobal):
         
         """Agregar explicación de indicadores globales"""
-        # if antel_movil_global.excepciones.dias.count() > 0 :
-        #     excluidos = f"""excluyen: {antel_movil.excepciones.dias}""" 
-        # else:
-        #     excluidos = f"""excluye {antel_movil.excepciones.dias}"""
-        
-        
-        # explicacion = """Para el cálculo de indicadores globales del mes se """ + excluidos + """ ya que las llamadas 
-        # del día superaron en más de un 20% al promedio de las 4 semanas anteriores, por 
-        # tanto, se configura la condición de excepción establecida en el SLA vigente."""
-        
-        # if antel_movil.excepciones:
-        #     self.story.append(Paragraph(explicacion, self.styles['TextoNormal'])) 
-        #     self.story.append(Spacer(1, 12))
-        
         self.story.append(Paragraph("Los indicadores globales son los siguientes:", self.styles['TextoNormal']))
         
         indicadores = [ 
@@ -412,47 +398,6 @@ class InformePDFGenerator:
         self.story.append(Paragraph(nota, self.styles['TextoPequeno']))
         self.story.append(Spacer(1, 18))
 
-    # def agregar_graficos_placeholder(self):
-    #     #TODO trabajar aca corregir.
-    #     """Agregar espacio para gráficos (placeholder)"""
-    #     #self.story.append(Paragraph("Evolución de Llamadas", self.styles['Subtitulo']))
-    #     descripcion = """Durante el mes se realizaron {interacciones 146.365} interacciones en el servicio Móvil. Se atendieron
-    #     {llamadas 140.846} llamadas, se realizaron {salientes 1.675} llamadas salientes y {llamadas_IZI 3.844} llamadas en la
-    #     gestión del sistema IZI.
-    #     El gráfico a continuación refleja la evolución de llamadas al servicio y llamadas
-    #     atendidas en los últimos meses."""
-        
-    #     self.story.append(Paragraph(descripcion, 
-    #                               self.styles['TextoNormal']))
-    #     self.story.append(Spacer(1, 6))
-        
-    #     # Placeholder para gráfico
-    #     placeholder_text = "[GRÁFICO: Evolución de llamadas - Se requiere implementación específica con datos históricos]"
-    #     self.story.append(Paragraph(placeholder_text, self.styles['TextoPequeno']))
-    #     self.story.append(Spacer(1, 12))
-        
-    #     # Información adicional
-    #     info_adicional = """Tiempo total dedicado a la atención
-    #     En el mes, se dedicaron 7.613,12 horas al contacto directo en línea con los clientes.
-
-    #     Congestión
-    #     La congestión del mes fue de 0,00%.
-    #     Durante el mes el tiempo de operación promedio fue de 194,59 segundos y el TRSAC fue de 15 segundos.
-
-    #     Las llamadas por consultas a referentes se computan por fuera del volumen total de llamadas al servicio.
-    #     Durante el mes se realizaron 3.247 consultas a referentes, el gráfico a continuación refleja el volumen de llamadas a referentes de los últimos meses."""
-        
-    #     self.story.append(Paragraph(info_adicional.replace('\n        ', '<br/>'), self.styles['TextoNormal']))
-    #     self.story.append(Spacer(1, 12))
-        
-    #     placeholder_text2 = "[GRÁFICO: Consultas a referentes - Se requiere implementación específica con datos históricos]"
-    #     self.story.append(Paragraph(placeholder_text2, self.styles['TextoPequeno']))
-    #     self.story.append(Spacer(1, 18))
-    #     """Agregar párrafo de cierre"""
-    #     cierre = """Finalmente, nos encontramos a las órdenes para cualquier aclaración respecto de 
-    #     este informe, así como para trabajar en las mejoras a realizar en el servicio."""
-    #     self.story.append(Paragraph(cierre, self.styles['TextoNormal']))
-
     def agregar_cierre(self):
         """Agregar párrafo de cierre"""
         cierre = """Finalmente, nos encontramos a las órdenes para cualquier aclaración respecto de 
@@ -494,7 +439,6 @@ class InformePDFGenerator:
     def generar_reporte(self, reporte: Reporte) -> bytes:
         """Generar el reporte completo"""
         
-        
         # Agregar todas las secciones
         self.agregar_titulo_principal() 
         self.crear_tabla_indicadores_principales(reporte.antel_movil_no_global, reporte.antel_movil_global)
@@ -503,8 +447,7 @@ class InformePDFGenerator:
         self.crear_seccion_reclamos(reporte.reclamos, reporte.motivosIzi611)
         self.crear_seccion_whatsapp(reporte.whatsapp)
         self.crear_seccion_salientes(reporte.salientes)
-        # self.agregar_graficos_placeholder()
-        self.crear_seccion_motivos_contacto(reporte.motivos_contacto, reporte.antel_movil_global.llamadas_atendidas_totales_global) #llamadas atendidas totales globales o no globales?
+        self.crear_seccion_motivos_contacto(reporte.motivos_contacto, reporte.antel_movil_global.llamadas_atendidas_totales_global)
         self.crear_seccion_automatismos(reporte.automatismos)
         self.agregar_cierre()
         self.agregar_footer_personalizado()
@@ -522,9 +465,9 @@ class InformePDFGenerator:
     
         print(f"Reporte generado en memoria ({len(pdf_bytes)} bytes)")
 
-        # Guardar manualmente donde quieras
-        # with open(self.filename, "wb") as f:
-        #     f.write(pdf_bytes)
+        #Guardar manualmente donde quieras
+        with open(self.filename, "wb") as f:
+            f.write(pdf_bytes)
 
         return pdf_bytes
 
