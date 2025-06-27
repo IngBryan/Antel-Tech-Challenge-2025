@@ -39,11 +39,11 @@ def procesar_excepcion_menor_20(bucket_name, prefix=""):
     blobs = list(storage_client.list_blobs(bucket, prefix=prefix))
     blob_excepcion = next((b for b in blobs if "excepción_20%" in b.name.lower()), None)
 
-    for blob in blobs:
-        nombre = blob.name.lower()
-        if "informe móvil" in nombre and "excepción_20%" in nombre:
-            print("Ya existe un archivo que contiene 'informe móvil' y 'excepción_20%'. No se procesa.")
-            return None, 1, 1
+    #for blob in blobs:
+    #    nombre = blob.name.lower()
+    #    if "informe móvil" in nombre and "excepción_20%" in nombre:
+    #        print("Ya existe un archivo que contiene 'informe móvil' y 'excepción_20%'. No se procesa.")
+    #        return None, 1, 1
 
     if not blob_excepcion:
         print("No se encontró un archivo con 'excepción_20%' en el nombre.")
